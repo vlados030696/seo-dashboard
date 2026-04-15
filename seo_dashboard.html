@@ -606,9 +606,9 @@ async function loadSheet(sheet) {
   document.getElementById('tableTitle').textContent = SHEETS[sheet].title;
   document.getElementById('tableCount').textContent = '';
 
-  const showCat = sheet.startsWith('keyword');
-  document.getElementById('catFilter').parentElement.style.display = showCat ? '' : 'none';
-  document.getElementById('catFilter').previousElementSibling.style.display = showCat ? '' : 'none';
+const showCat = true;
+document.getElementById('catFilter').parentElement.style.display = '';
+document.getElementById('catFilter').previousElementSibling.style.display = '';
 
   try {
     currentData = await fetchCSV(sheet);
