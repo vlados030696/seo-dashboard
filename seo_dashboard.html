@@ -418,7 +418,7 @@ let sortCol       = null;
 let sortDir       = 1;
 
 function csvUrl(sheet) {
-  return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&sheet=${sheet}`;
+  return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheet)}`;
 }
 
 async function fetchCSV(sheet) {
