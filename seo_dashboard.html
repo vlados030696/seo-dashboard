@@ -477,6 +477,7 @@ function fmtCat(v) {
   if (!v || v === 'other') return `<span class="tag-cat cat-other">${v||'—'}</span>`;
   if (v === 'food') return `<span class="tag-cat cat-food">food</span>`;
   if (v === 'nonfood') return `<span class="tag-cat cat-nonfood">nonfood</span>`;
+  if (v === 'brand')   return `<span class="tag-cat" style="background:rgba(255,200,0,.1);color:#ffc800;border:1px solid rgba(255,200,0,.25)">brand</span>`;
   return `<span class="tag-cat cat-other">${v}</span>`;
 }
 
