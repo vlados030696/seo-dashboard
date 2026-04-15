@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEO Dashboard — Конкуренти</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Unbounded:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0f;
+  --surface: #111118;
+  --surface2: #1a1a24;
+  --border: #2a2a38;
+  --accent: #00e5a0;
+  --accent2: #7c6af7;
+  --warn: #ff6b6b;
+  --text: #e8e8f0;
+  --muted: #6b6b88;
+  --new: #00d4ff;
+  --sheet-id: "1COlbKcnpKLiqc9mJkfjv_wEOTGvDaDq9gtdbS55m0gM";
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* GRID BG */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,229,160,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,160,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.container { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 0 24px 60px; }
+
+/* HEADER */
+header {
+  padding: 32px 0 24px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 32px;
+}
+.logo {
+  font-family: 'Unbounded', sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.header-title {
+  font-family: 'Unbounded', sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: 6px;
+}
+.header-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.update-badge {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity: 1; } 50% { opacity: .3; }
+}
+
+/* STATS ROW */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.stat-card:hover { border-color: var(--accent); }
+.stat-card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--accent);
+  opacity: .4;
+}
+.stat-card.warn::after { background: var(--warn); }
+.stat-card.new-c::after { background: var(--new); }
+.stat-card.keys::after { background: var(--accent2); }
+.stat-label { font-size: 10px; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 8px; }
+.stat-val { font-family: 'Unbounded', sans-serif; font-size: 28px; font-weight: 800; color: var(--text); }
+.stat-sub { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+/* TABS */
+.tabs {
+  display: flex; gap: 4px;
+  margin-bottom: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  width: fit-content;
+}
+.tab {
+  padding: 8px 20px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  transition: all .2s;
+  letter-spacing: .05em;
+}
+.tab:hover { color: var(--text); }
+.tab.active {
+  background: var(--surface2);
+  color: var(--accent);
+  border: 1px solid var(--border);
+}
+
+/* FILTERS */
+.filters {
+  display: flex; gap: 10px; align-items: center;
+  margin-bottom: 16px; flex-wrap: wrap;
+}
+.filter-select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  padding: 7px 12px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color .2s;
+}
+.filter-select:hover, .filter-select:focus { border-color: var(--accent); }
+.filter-label { font-size: 11px; color: var(--muted); }
+.search-input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  padding: 7px 12px;
+  outline: none;
+  width: 220px;
+  transition: border-color .2s;
+}
+.search-input:focus { border-color: var(--accent); }
+.search-input::placeholder { color: var(--muted); }
+
+/* TABLE */
+.table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.table-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.table-title { font-size: 11px; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
+.table-count { font-size: 11px; color: var(--accent); }
+
+table { width: 100%; border-collapse: collapse; }
+thead th {
+  padding: 10px 16px;
+  text-align: left;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+thead th:hover { color: var(--accent); }
+thead th.sorted { color: var(--accent); }
+tbody tr {
+  border-bottom: 1px solid rgba(42,42,56,.6);
+  transition: background .15s;
+}
+tbody tr:hover { background: var(--surface2); }
+tbody tr:last-child { border-bottom: none; }
+td {
+  padding: 11px 16px;
+  font-size: 12px;
+  color: var(--text);
+  max-width: 320px;
+}
+.url-cell {
+  color: var(--accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 280px;
+  font-size: 11px;
+}
+.url-cell a { color: inherit; text-decoration: none; }
+.url-cell a:hover { text-decoration: underline; }
+.comp-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  white-space: nowrap;
+}
+.badge-0 { background: rgba(0,229,160,.15); color: var(--accent); border: 1px solid rgba(0,229,160,.3); }
+.badge-1 { background: rgba(124,106,247,.15); color: var(--accent2); border: 1px solid rgba(124,106,247,.3); }
+.badge-2 { background: rgba(255,107,107,.15); color: var(--warn); border: 1px solid rgba(255,107,107,.3); }
+.badge-3 { background: rgba(0,212,255,.15); color: var(--new); border: 1px solid rgba(0,212,255,.3); }
+
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.wow-pos { color: var(--accent); }
+.wow-neg { color: var(--warn); }
+.tag-new {
+  display: inline-block;
+  background: rgba(0,212,255,.15);
+  color: var(--new);
+  border: 1px solid rgba(0,212,255,.3);
+  border-radius: 4px;
+  font-size: 9px;
+  padding: 1px 6px;
+  letter-spacing: .08em;
+  margin-left: 6px;
+}
+.tag-cat {
+  display: inline-block;
+  border-radius: 4px;
+  font-size: 9px;
+  padding: 1px 6px;
+  letter-spacing: .06em;
+}
+.cat-food { background: rgba(0,229,160,.1); color: var(--accent); border: 1px solid rgba(0,229,160,.2); }
+.cat-nonfood { background: rgba(124,106,247,.1); color: var(--accent2); border: 1px solid rgba(124,106,247,.2); }
+.cat-other { background: rgba(107,107,136,.1); color: var(--muted); border: 1px solid rgba(107,107,136,.2); }
+
+/* LOADING */
+.loading {
+  display: flex; align-items: center; justify-content: center;
+  padding: 60px;
+  color: var(--muted);
+  font-size: 12px;
+  gap: 10px;
+}
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error-msg {
+  padding: 40px;
+  text-align: center;
+  color: var(--warn);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+/* PAGINATION */
+.pagination {
+  display: flex; align-items: center; gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  justify-content: flex-end;
+}
+.page-btn {
+  padding: 5px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all .2s;
+}
+.page-btn:hover { border-color: var(--accent); color: var(--accent); }
+.page-btn.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.page-btn:disabled { opacity: .3; cursor: not-allowed; }
+.page-info { font-size: 11px; color: var(--muted); }
+
+/* EMPTY */
+.empty { padding: 50px; text-align: center; color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div>
+      <div class="logo">SEO Intelligence</div>
+      <div class="header-title">Моніторинг конкурентів</div>
+      <div class="header-sub" id="lastUpdate">Завантаження даних...</div>
+    </div>
+    <div class="update-badge">
+      <div class="dot"></div>
+      <span id="updateTime">—</span>
+    </div>
+  </header>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">Всього сторінок</div>
+      <div class="stat-val" id="stat-pages">—</div>
+      <div class="stat-sub">у моніторингу</div>
+    </div>
+    <div class="stat-card new-c">
+      <div class="stat-label">Нові сторінки</div>
+      <div class="stat-val" id="stat-new" style="color:var(--new)">—</div>
+      <div class="stat-sub">за останній тиждень</div>
+    </div>
+    <div class="stat-card keys">
+      <div class="stat-label">Ключових слів</div>
+      <div class="stat-val" id="stat-keys" style="color:var(--accent2)">—</div>
+      <div class="stat-sub">відстежується</div>
+    </div>
+    <div class="stat-card warn">
+      <div class="stat-label">Конкурентів</div>
+      <div class="stat-val" id="stat-comps" style="color:var(--warn)">—</div>
+      <div class="stat-sub">у базі</div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('pages_all', this)">Всі сторінки</button>
+    <button class="tab" onclick="switchTab('pages_new', this)">Нові сторінки</button>
+    <button class="tab" onclick="switchTab('keywords_all', this)">Ключові слова</button>
+    <button class="tab" onclick="switchTab('keywords_top_volume', this)">Топ за об'ємом</button>
+  </div>
+
+  <div class="filters">
+    <span class="filter-label">Конкурент:</span>
+    <select class="filter-select" id="compFilter" onchange="applyFilters()">
+      <option value="">Всі</option>
+    </select>
+    <span class="filter-label">Категорія:</span>
+    <select class="filter-select" id="catFilter" onchange="applyFilters()">
+      <option value="">Всі</option>
+      <option value="food">food</option>
+      <option value="nonfood">nonfood</option>
+      <option value="other">other</option>
+    </select>
+    <input class="search-input" id="searchInput" placeholder="Пошук по URL або ключу..." oninput="applyFilters()">
+    <span class="filter-label" id="filteredCount" style="margin-left:auto"></span>
+  </div>
+
+  <div class="table-wrap">
+    <div class="table-header">
+      <span class="table-title" id="tableTitle">Завантаження...</span>
+      <span class="table-count" id="tableCount"></span>
+    </div>
+    <div id="tableBody">
+      <div class="loading"><div class="spinner"></div> Завантажуємо дані з Google Sheets...</div>
+    </div>
+    <div class="pagination" id="pagination"></div>
+  </div>
+</div>
+
+<script>
+const SHEET_ID = '1COlbKcnpKLiqc9mJkfjv_wEOTGvDaDq9gtdbS55m0gM';
+const SHEETS = {
+  pages_all:           { title: 'Всі сторінки конкурентів', type: 'pages' },
+  pages_new:           { title: 'Нові сторінки', type: 'pages_new' },
+  keywords_all:        { title: 'Всі ключові слова', type: 'keywords' },
+  keywords_top_volume: { title: 'Топ ключів за об\'ємом пошуку', type: 'keywords' },
+};
+
+const compColors = {};
+let currentSheet  = 'pages_all';
+let currentData   = [];
+let filteredData  = [];
+let currentPage   = 1;
+const PAGE_SIZE   = 50;
+let sortCol       = null;
+let sortDir       = 1;
+
+function csvUrl(sheet) {
+  return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&sheet=${sheet}`;
+}
+
+async function fetchCSV(sheet) {
+  const url = csvUrl(sheet);
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const text = await r.text();
+  return parseCSV(text);
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  return lines.slice(1).map(line => {
+    const vals = [];
+    let inQ = false, cur = '';
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === '"') { inQ = !inQ; continue; }
+      if (line[i] === ',' && !inQ) { vals.push(cur); cur = ''; continue; }
+      cur += line[i];
+    }
+    vals.push(cur);
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = (vals[i] || '').trim());
+    return obj;
+  });
+}
+
+function getCompColor(comp) {
+  if (!compColors[comp]) {
+    const idx = Object.keys(compColors).length % 4;
+    compColors[comp] = idx;
+  }
+  return compColors[comp];
+}
+
+function fmtNum(v) {
+  const n = parseInt(v) || 0;
+  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n/1000).toFixed(0) + 'K';
+  return n.toLocaleString();
+}
+
+function fmtWow(v) {
+  if (v === '' || v === 'None' || v === undefined) return '<span style="color:var(--muted)">—</span>';
+  const n = parseFloat(v);
+  if (isNaN(n)) return '<span style="color:var(--muted)">—</span>';
+  const cls = n > 0 ? 'wow-pos' : n < 0 ? 'wow-neg' : '';
+  const sign = n > 0 ? '+' : '';
+  return `<span class="${cls}">${sign}${n.toFixed(1)}%</span>`;
+}
+
+function fmtCat(v) {
+  if (!v || v === 'other') return `<span class="tag-cat cat-other">${v||'—'}</span>`;
+  if (v === 'food') return `<span class="tag-cat cat-food">food</span>`;
+  if (v === 'nonfood') return `<span class="tag-cat cat-nonfood">nonfood</span>`;
+  return `<span class="tag-cat cat-other">${v}</span>`;
+}
+
+function renderTable(data, type) {
+  const tbody = document.getElementById('tableBody');
+  if (!data.length) {
+    tbody.innerHTML = '<div class="empty">Дані відсутні або не збігаються з фільтром</div>';
+    return;
+  }
+
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const page  = data.slice(start, start + PAGE_SIZE);
+
+  if (type === 'pages' || type === 'pages_new') {
+    const cols = type === 'pages_new'
+      ? [['competitor','Конкурент'],['url','URL'],['traffic','Трафік'],['keywords_n','Ключів']]
+      : [['competitor','Конкурент'],['url','URL'],['traffic','Трафік'],['keywords_n','Ключів'],['wow_pct','WoW %']];
+
+    tbody.innerHTML = `<table>
+      <thead><tr>${cols.map(([k,l]) =>
+        `<th onclick="sortBy('${k}')" class="${sortCol===k?'sorted':''}">${l}${sortCol===k?(sortDir>0?' ↑':' ↓'):''}</th>`
+      ).join('')}</tr></thead>
+      <tbody>${page.map(row => `<tr>
+        <td><span class="comp-badge badge-${getCompColor(row.competitor)}">${row.competitor||'—'}</span></td>
+        <td class="url-cell"><a href="https://${row.url||''}" target="_blank">${row.url||'—'}</a>${row.is_new==='True'?'<span class="tag-new">NEW</span>':''}</td>
+        <td class="num">${fmtNum(row.traffic)}</td>
+        <td class="num">${row.keywords_n||'—'}</td>
+        ${type==='pages'?`<td class="num">${fmtWow(row.wow_pct)}</td>`:''}
+      </tr>`).join('')}</tbody>
+    </table>`;
+  } else {
+    const cols = [
+      ['competitor','Конкурент'],['keyword','Ключ'],['category','Кат.'],
+      ['position','Поз.'],['volume','Об\'єм'],['traffic','Трафік'],['wow_pct','WoW %']
+    ];
+    tbody.innerHTML = `<table>
+      <thead><tr>${cols.map(([k,l]) =>
+        `<th onclick="sortBy('${k}')" class="${sortCol===k?'sorted':''}">${l}${sortCol===k?(sortDir>0?' ↑':' ↓'):''}</th>`
+      ).join('')}</tr></thead>
+      <tbody>${page.map(row => `<tr>
+        <td><span class="comp-badge badge-${getCompColor(row.competitor)}">${row.competitor||'—'}</span></td>
+        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${row.keyword||'—'}</td>
+        <td>${fmtCat(row.category)}</td>
+        <td class="num">${row.position||'—'}</td>
+        <td class="num">${fmtNum(row.volume)}</td>
+        <td class="num">${fmtNum(row.traffic)}</td>
+        <td class="num">${fmtWow(row.wow_pct)}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+
+  renderPagination(data.length);
+}
+
+function renderPagination(total) {
+  const pages = Math.ceil(total / PAGE_SIZE);
+  const pg = document.getElementById('pagination');
+  if (pages <= 1) { pg.innerHTML = ''; return; }
+  let html = `<span class="page-info">Стор. ${currentPage} з ${pages} (${total} рядків)</span>`;
+  html += `<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage<=1?'disabled':''}>←</button>`;
+  const range = [];
+  for (let i = Math.max(1,currentPage-2); i <= Math.min(pages,currentPage+2); i++) range.push(i);
+  range.forEach(p => {
+    html += `<button class="page-btn ${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`;
+  });
+  html += `<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage>=pages?'disabled':''}>→</button>`;
+  pg.innerHTML = html;
+}
+
+function goPage(p) {
+  currentPage = p;
+  renderTable(filteredData, SHEETS[currentSheet].type);
+}
+
+function sortBy(col) {
+  if (sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = -1; }
+  filteredData.sort((a, b) => {
+    const av = parseFloat(a[col]) || a[col] || '';
+    const bv = parseFloat(b[col]) || b[col] || '';
+    if (av < bv) return -sortDir;
+    if (av > bv) return sortDir;
+    return 0;
+  });
+  currentPage = 1;
+  renderTable(filteredData, SHEETS[currentSheet].type);
+}
+
+function applyFilters() {
+  const comp   = document.getElementById('compFilter').value;
+  const cat    = document.getElementById('catFilter').value;
+  const search = document.getElementById('searchInput').value.toLowerCase();
+
+  filteredData = currentData.filter(row => {
+    if (comp   && row.competitor !== comp) return false;
+    if (cat    && row.category   !== cat)  return false;
+    if (search) {
+      const hay = (row.url || row.keyword || '').toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  document.getElementById('filteredCount').textContent =
+    filteredData.length !== currentData.length
+      ? `Показано: ${filteredData.length} з ${currentData.length}`
+      : '';
+
+  currentPage = 1;
+  document.getElementById('tableCount').textContent = `${filteredData.length} рядків`;
+  renderTable(filteredData, SHEETS[currentSheet].type);
+}
+
+function updateCompFilter(data) {
+  const comps = [...new Set(data.map(r => r.competitor).filter(Boolean))].sort();
+  const sel = document.getElementById('compFilter');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Всі</option>' +
+    comps.map(c => `<option value="${c}" ${c===cur?'selected':''}>${c}</option>`).join('');
+}
+
+async function loadSheet(sheet) {
+  document.getElementById('tableBody').innerHTML =
+    '<div class="loading"><div class="spinner"></div> Завантажуємо дані...</div>';
+  document.getElementById('pagination').innerHTML = '';
+  document.getElementById('tableTitle').textContent = SHEETS[sheet].title;
+  document.getElementById('tableCount').textContent = '';
+
+  const showCat = sheet.startsWith('keyword');
+  document.getElementById('catFilter').parentElement.style.display = showCat ? '' : 'none';
+  document.getElementById('catFilter').previousElementSibling.style.display = showCat ? '' : 'none';
+
+  try {
+    currentData = await fetchCSV(sheet);
+    updateCompFilter(currentData);
+    applyFilters();
+
+    // update stats on first load
+    if (sheet === 'pages_all') {
+      document.getElementById('stat-pages').textContent = fmtNum(currentData.length);
+      const comps = new Set(currentData.map(r => r.competitor).filter(Boolean));
+      document.getElementById('stat-comps').textContent = comps.size;
+      const date = currentData[0]?.date || '';
+      if (date) {
+        document.getElementById('lastUpdate').textContent = `Дані за: ${date}`;
+        document.getElementById('updateTime').textContent = `Оновлено: ${date}`;
+      }
+    }
+    if (sheet === 'pages_new') {
+      document.getElementById('stat-new').textContent = fmtNum(currentData.length);
+    }
+    if (sheet === 'keywords_all') {
+      document.getElementById('stat-keys').textContent = fmtNum(currentData.length);
+    }
+  } catch (e) {
+    document.getElementById('tableBody').innerHTML = `
+      <div class="error-msg">
+        ⚠ Не вдалося завантажити дані<br><br>
+        Переконайся що таблиця відкрита для перегляду:<br>
+        Google Sheets → Поділитися → Всі у кого є посилання → Читач<br><br>
+        <small style="color:var(--muted)">${e.message}</small>
+      </div>`;
+  }
+}
+
+async function switchTab(sheet, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  currentSheet = sheet;
+  sortCol = null;
+  currentPage = 1;
+  document.getElementById('searchInput').value = '';
+  await loadSheet(sheet);
+}
+
+// Init — load all sheets for stats silently
+async function init() {
+  await loadSheet('pages_all');
+  // load other sheets for stats counters
+  try {
+    const pn = await fetchCSV('pages_new');
+    document.getElementById('stat-new').textContent = fmtNum(pn.length);
+  } catch(e) {}
+  try {
+    const ka = await fetchCSV('keywords_all');
+    document.getElementById('stat-keys').textContent = fmtNum(ka.length);
+  } catch(e) {}
+}
+
+init();
+</script>
+</body>
+</html>
