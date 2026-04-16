@@ -285,19 +285,7 @@ td {
 .pt-promo      { background: rgba(253,161,16,.12); color: var(--accent); border: 1px solid rgba(253,161,16,.3); }
 .pt-brand_page { background: rgba(255,200,0,.1); color: #ffc800; border: 1px solid rgba(255,200,0,.25); }
 .pt-main       { background: rgba(255,107,107,.1); color: var(--warn); border: 1px solid rgba(255,107,107,.2); }
-.pt-service    { background: rgba(107,107,136,.1); color: var(--muted); border: 1px solid rgba(107,107,136,.2); }
-.pt-other      { background: rgba(42,42,56,.4); color: var(--muted); border: 1px solid rgba(42,42,56,.8); }
-
-/* SUMMARY TABLE */
-.summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; padding: 20px; }
-.summary-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
-.summary-comp { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 12px; }
-.summary-row { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid rgba(42,42,56,.5); }
-.summary-row:last-child { border-bottom: none; }
-.summary-type { font-size: 11px; }
-.summary-nums { display: flex; gap: 16px; font-size: 11px; color: var(--muted); }
-.summary-nums span { font-variant-numeric: tabular-nums; }
-.summary-nums .hi { color: var(--text); font-weight: 500; }
+.pt-search     { background: rgba(107,107,136,.1); color: var(--muted); border: 1px solid rgba(107,107,136,.2); }
 
 /* LOADING */
 .loading {
@@ -347,8 +335,10 @@ td {
 .page-btn:disabled { opacity: .3; cursor: not-allowed; }
 .page-info { font-size: 11px; color: var(--muted); }
 
-/* EMPTY */
-.empty { padding: 50px; text-align: center; color: var(--muted); font-size: 12px; }
+/* CHARTS */
+.chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; }
+.chart-title { font-size: 11px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 14px; }
+
 </style>
 </head>
 <body>
@@ -394,9 +384,10 @@ td {
     <button class="tab" onclick="switchTab('pages_type_summary', this)">Типи сторінок</button>
     <button class="tab" onclick="switchTab('keywords_all', this)">Ключові слова</button>
     <button class="tab" onclick="switchTab('keywords_top_volume', this)">Топ за об'ємом</button>
+    <button class="tab" onclick="showCharts(this)">Графіки</button>
   </div>
 
-  <div class="filters">
+  <div class="filters" id="filters">
     <span class="filter-label">Конкурент:</span>
     <select class="filter-select" id="compFilter" onchange="applyFilters()">
       <option value="">Всі</option>
@@ -417,7 +408,36 @@ td {
     <span class="filter-label" id="filteredCount" style="margin-left:auto"></span>
   </div>
 
-  <div class="table-wrap">
+  <div id="chartsPanel" style="display:none">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div class="chart-card">
+        <div class="chart-title">Трафік по сторінках — розподіл по конкурентах</div>
+        <div style="position:relative;height:260px"><canvas id="ch1" role="img" aria-label="Трафік конкурентів по типах сторінок"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Кількість сторінок по типах</div>
+        <div style="position:relative;height:260px"><canvas id="ch2" role="img" aria-label="Кількість сторінок по типах"></canvas></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div class="chart-card">
+        <div class="chart-title">Об'єм пошуку ключів по категоріях (food / nonfood / brand / other)</div>
+        <div style="position:relative;height:260px"><canvas id="ch3" role="img" aria-label="Обєм ключів по категоріях"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Кількість ключів по конкурентах і категоріях</div>
+        <div style="position:relative;height:260px"><canvas id="ch4" role="img" aria-label="Кількість ключів по конкурентах"></canvas></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:16px">
+      <div class="chart-card">
+        <div class="chart-title">Топ-15 сторінок по трафіку (всі конкуренти)</div>
+        <div style="position:relative;height:360px"><canvas id="ch5" role="img" aria-label="Топ сторінки по трафіку"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrap" id="tableWrap">
     <div class="table-header">
       <span class="table-title" id="tableTitle">Завантаження...</span>
       <span class="table-count" id="tableCount"></span>
@@ -426,15 +446,14 @@ td {
       <div class="loading"><div class="spinner"></div> Завантажуємо дані з Google Sheets...</div>
     </div>
     <div class="pagination" id="pagination"></div>
-  </div>
+  </div><!-- /table-wrap -->
 </div>
 
-<script>
-const SHEET_ID = '1COlbKcnpKLiqc9mJkfjv_wEOTGvDaDq9gtdbS55m0gM';
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script> = '1COlbKcnpKLiqc9mJkfjv_wEOTGvDaDq9gtdbS55m0gM';
 const SHEETS = {
   pages_all:           { title: 'Всі сторінки конкурентів', type: 'pages' },
   pages_new:           { title: 'Нові сторінки', type: 'pages_new' },
-  pages_type_summary:  { title: 'Зведення по типах сторінок', type: 'summary' },
   keywords_all:        { title: 'Всі ключові слова', type: 'keywords' },
   keywords_top_volume: { title: 'Топ ключів за об\'ємом пошуку', type: 'keywords' },
 };
@@ -523,37 +542,6 @@ function renderTable(data, type) {
     return;
   }
 
-  // Summary view
-  if (type === 'summary') {
-    const byComp = {};
-    data.forEach(row => {
-      const c = row.competitor || 'unknown';
-      if (!byComp[c]) byComp[c] = {};
-      const pt = row.page_type || 'other';
-      byComp[c][pt] = {
-        count: parseInt(row.pages_count) || 0,
-        traffic: parseInt(row.total_traffic) || 0
-      };
-    });
-    const typeOrder = ['product','category','subcategory','section','promo','blog','brand_page','main','service','other'];
-    tbody.innerHTML = `<div class="summary-grid">${
-      Object.entries(byComp).map(([comp, types]) => `
-        <div class="summary-card">
-          <div class="summary-comp">${comp}</div>
-          ${typeOrder.filter(t => types[t]).map(t => `
-            <div class="summary-row">
-              <span class="summary-type">${fmtPageType(t)}</span>
-              <div class="summary-nums">
-                <span><span class="hi">${(types[t].count||0).toLocaleString()}</span> стор.</span>
-                <span><span class="hi">${fmtNum(types[t].traffic)}</span> трафік</span>
-              </div>
-            </div>`).join('')}
-        </div>`).join('')
-    }</div>`;
-    document.getElementById('pagination').innerHTML = '';
-    return;
-  }
-
   const start = (currentPage - 1) * PAGE_SIZE;
   const page  = data.slice(start, start + PAGE_SIZE);
 
@@ -568,7 +556,7 @@ function renderTable(data, type) {
       ).join('')}</tr></thead>
       <tbody>${page.map(row => `<tr>
         <td><span class="comp-badge badge-${getCompColor(row.competitor)}">${row.competitor||'—'}</span></td>
-        <td class="url-cell"><a href="https://${row.url||''}" target="_blank">${row.url||'—'}</a>${row.is_new==='True'?'<span class="tag-new">NEW</span>':''}</td>
+        <td class="url-cell"><a href="${(row.url||'').startsWith('http')?row.url:'https://'+row.url}" target="_blank">${row.url||'—'}</a>${row.is_new==='True'?'<span class="tag-new">NEW</span>':''}</td>
         <td>${fmtPageType(row.page_type)}</td>
         <td class="num">${fmtNum(row.traffic)}</td>
         <td class="num">${row.keywords_n||'—'}</td>
@@ -638,16 +626,7 @@ function applyFilters() {
   const cat      = document.getElementById('catFilter').value;
   const pageType = document.getElementById('pageTypeFilter').value;
   const search   = document.getElementById('searchInput').value.toLowerCase();
-  const type     = SHEETS[currentSheet].type;
-  const isPages  = type !== 'keywords';
-
-  // Summary — no filtering, show all
-  if (type === 'summary') {
-    filteredData = currentData;
-    document.getElementById('tableCount').textContent = `${currentData.length} рядків`;
-    renderTable(filteredData, type);
-    return;
-  }
+  const isPages  = SHEETS[currentSheet].type !== 'keywords';
 
   filteredData = currentData.filter(row => {
     if (comp     && row.competitor !== comp) return false;
@@ -693,15 +672,11 @@ async function loadSheet(sheet) {
   document.getElementById('tableTitle').textContent = SHEETS[sheet].title;
   document.getElementById('tableCount').textContent = '';
 
-  const isPages   = SHEETS[sheet].type !== 'keywords';
-  const isSummary = SHEETS[sheet].type === 'summary';
-  document.getElementById('catLabel').style.display        = (!isPages) ? '' : 'none';
-  document.getElementById('catFilter').style.display       = (!isPages) ? '' : 'none';
-  document.getElementById('ptLabel').style.display         = (isPages && !isSummary) ? '' : 'none';
-  document.getElementById('pageTypeFilter').style.display  = (isPages && !isSummary) ? '' : 'none';
-  document.getElementById('compFilter').parentElement.style.display = isSummary ? 'none' : '';
-  // show/hide search
-  document.getElementById('searchInput').style.display = isSummary ? 'none' : '';
+  const isPages = SHEETS[sheet].type !== 'keywords';
+  document.getElementById('catLabel').style.display    = isPages ? 'none' : '';
+  document.getElementById('catFilter').style.display   = isPages ? 'none' : '';
+  document.getElementById('ptLabel').style.display     = isPages ? '' : 'none';
+  document.getElementById('pageTypeFilter').style.display = isPages ? '' : 'none';
 
   try {
     currentData = await fetchCSV(sheet);
@@ -740,6 +715,9 @@ async function loadSheet(sheet) {
 async function switchTab(sheet, btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
+  document.getElementById('chartsPanel').style.display = 'none';
+  document.getElementById('tableWrap').style.display   = '';
+  document.getElementById('filters').style.display     = '';
   currentSheet = sheet;
   sortCol = null;
   currentPage = 1;
@@ -761,6 +739,170 @@ async function init() {
     const ka = await fetchCSV('keywords_all');
     document.getElementById('stat-keys').textContent = fmtNum(ka.length);
   } catch(e) {}
+}
+
+async function showCharts(btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('chartsPanel').style.display = 'block';
+  document.getElementById('tableWrap').style.display   = 'none';
+  document.getElementById('filters').style.display     = 'none';
+
+  if (window._chartsBuilt) return;
+  window._chartsBuilt = true;
+
+  document.getElementById('chartsPanel').innerHTML =
+    '<div class="loading"><div class="spinner"></div> Завантажуємо дані для графіків...</div>';
+
+  try {
+    const [pages, keywords] = await Promise.all([
+      fetchCSV('pages_all'),
+      fetchCSV('keywords_all')
+    ]);
+
+    document.getElementById('chartsPanel').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+        <div class="chart-card"><div class="chart-title">Трафік по конкурентах і типах сторінок</div><div style="position:relative;height:260px"><canvas id="ch1" role="img" aria-label="Трафік конкурентів по типах"></canvas></div></div>
+        <div class="chart-card"><div class="chart-title">Кількість сторінок по типах</div><div style="position:relative;height:260px"><canvas id="ch2" role="img" aria-label="Кількість сторінок"></canvas></div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+        <div class="chart-card"><div class="chart-title">Об'єм пошуку ключів по категоріях</div><div style="position:relative;height:260px"><canvas id="ch3" role="img" aria-label="Обєм ключів"></canvas></div></div>
+        <div class="chart-card"><div class="chart-title">Кількість ключів по конкурентах і категоріях</div><div style="position:relative;height:260px"><canvas id="ch4" role="img" aria-label="Кількість ключів"></canvas></div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:16px">
+        <div class="chart-card"><div class="chart-title">Топ-15 сторінок по трафіку</div><div style="position:relative;height:420px"><canvas id="ch5" role="img" aria-label="Топ сторінок"></canvas></div></div>
+      </div>`;
+
+    await buildCharts(pages, keywords);
+  } catch(e) {
+    document.getElementById('chartsPanel').innerHTML =
+      `<div class="error-msg">Не вдалося завантажити дані: ${e.message}</div>`;
+  }
+}
+
+async function buildCharts(pages, keywords) {
+  const comps   = [...new Set(pages.map(r => r.competitor).filter(Boolean))].sort();
+  const ptypes  = ['product','category','subcategory','section','promo','blog','brand_page','main','other'];
+  const cats    = ['food','nonfood','brand','other'];
+
+  const COMP_COLORS = ['#00e5a0','#7c6af7','#ff6b6b','#00d4ff'];
+  const PT_COLORS   = ['#00e5a0','#7c6af7','#fda110','#00d4ff','#ff6b6b','#a0c4ff','#ffc800','#888','#444'];
+
+  // CH1: Stacked bar — трафік по конкурентах і типах сторінок
+  const ch1Data = ptypes.map(pt => ({
+    label: pt,
+    data: comps.map(c => {
+      const rows = pages.filter(r => r.competitor === c && r.page_type === pt);
+      return rows.reduce((s, r) => s + (parseInt(r.traffic)||0), 0);
+    }),
+    backgroundColor: PT_COLORS[ptypes.indexOf(pt)] + 'cc',
+  }));
+  new Chart(document.getElementById('ch1'), {
+    type: 'bar',
+    data: { labels: comps, datasets: ch1Data },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { stacked: true, ticks: { color: '#6b6b88', font: { size: 11 } }, grid: { color: 'rgba(42,42,56,.5)' } },
+        y: { stacked: true, ticks: { color: '#6b6b88', font: { size: 10 }, callback: v => v>=1000000?(v/1000000).toFixed(1)+'M':v>=1000?(v/1000).toFixed(0)+'K':v }, grid: { color: 'rgba(42,42,56,.5)' } }
+      }
+    }
+  });
+
+  // CH2: Doughnut — кількість сторінок по типах (всі конкуренти)
+  const ptCounts = ptypes.map(pt => pages.filter(r => r.page_type === pt).length);
+  new Chart(document.getElementById('ch2'), {
+    type: 'doughnut',
+    data: {
+      labels: ptypes,
+      datasets: [{ data: ptCounts, backgroundColor: PT_COLORS.map(c => c+'cc'), borderWidth: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true, position: 'right', labels: { color: '#6b6b88', font: { size: 10 }, boxWidth: 10, padding: 8 } }
+      }
+    }
+  });
+
+  // CH3: Stacked bar — об'єм пошуку ключів по категоріях і конкурентах
+  const ch3Data = cats.map((cat, ci) => ({
+    label: cat,
+    data: comps.map(c => {
+      const rows = keywords.filter(r => r.competitor === c && r.category === cat);
+      return rows.reduce((s, r) => s + (parseInt(r.volume)||0), 0);
+    }),
+    backgroundColor: [COMP_COLORS[0], COMP_COLORS[1], '#fda110', '#888'][ci] + 'cc',
+  }));
+  new Chart(document.getElementById('ch3'), {
+    type: 'bar',
+    data: { labels: comps, datasets: ch3Data },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, labels: { color: '#6b6b88', font: { size: 10 }, boxWidth: 10 } } },
+      scales: {
+        x: { stacked: true, ticks: { color: '#6b6b88', font: { size: 11 } }, grid: { color: 'rgba(42,42,56,.5)' } },
+        y: { stacked: true, ticks: { color: '#6b6b88', font: { size: 10 }, callback: v => v>=1000000?(v/1000000).toFixed(1)+'M':v>=1000?(v/1000).toFixed(0)+'K':v }, grid: { color: 'rgba(42,42,56,.5)' } }
+      }
+    }
+  });
+
+  // CH4: Grouped bar — кількість ключів по конкурентах і категоріях
+  const ch4Data = cats.map((cat, ci) => ({
+    label: cat,
+    data: comps.map(c => keywords.filter(r => r.competitor === c && r.category === cat).length),
+    backgroundColor: [COMP_COLORS[0], COMP_COLORS[1], '#fda110', '#888'][ci] + 'cc',
+  }));
+  new Chart(document.getElementById('ch4'), {
+    type: 'bar',
+    data: { labels: comps, datasets: ch4Data },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, labels: { color: '#6b6b88', font: { size: 10 }, boxWidth: 10 } } },
+      scales: {
+        x: { ticks: { color: '#6b6b88', font: { size: 11 } }, grid: { color: 'rgba(42,42,56,.5)' } },
+        y: { ticks: { color: '#6b6b88', font: { size: 10 } }, grid: { color: 'rgba(42,42,56,.5)' } }
+      }
+    }
+  });
+
+  // CH5: Horizontal bar — топ-15 сторінок по трафіку
+  const top15 = [...pages]
+    .sort((a,b) => (parseInt(b.traffic)||0) - (parseInt(a.traffic)||0))
+    .slice(0, 15);
+  const ch5Colors = top15.map(r => {
+    const idx = comps.indexOf(r.competitor);
+    return COMP_COLORS[idx % COMP_COLORS.length] + 'cc';
+  });
+  new Chart(document.getElementById('ch5'), {
+    type: 'bar',
+    data: {
+      labels: top15.map(r => {
+        try { return new URL(r.url.startsWith('http')?r.url:'https://'+r.url).pathname.slice(0,45); }
+        catch { return r.url.slice(0,45); }
+      }),
+      datasets: [{
+        label: 'Трафік',
+        data: top15.map(r => parseInt(r.traffic)||0),
+        backgroundColor: ch5Colors,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: ctx => {
+          const r = top15[ctx.dataIndex];
+          return ` ${ctx.raw.toLocaleString()} · ${r.competitor} · ${r.page_type||''}`;
+        }}
+      }},
+      scales: {
+        x: { ticks: { color: '#6b6b88', font: { size: 10 }, callback: v => v>=1000000?(v/1000000).toFixed(1)+'M':v>=1000?(v/1000).toFixed(0)+'K':v }, grid: { color: 'rgba(42,42,56,.5)' } },
+        y: { ticks: { color: '#9090aa', font: { size: 10 } }, grid: { color: 'rgba(42,42,56,.3)' } }
+      }
+    }
+  });
 }
 
 init();
