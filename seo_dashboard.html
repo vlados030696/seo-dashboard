@@ -771,17 +771,37 @@ function buildCharts(pages, keywords) {
   const cBtn = (c,fn) => `<button onclick="${fn}('${c}',this)" style="font-size:10px;padding:3px 10px;border-radius:4px;border:1.5px solid ${CC[c]||'#888'};background:transparent;color:${CC[c]||'#888'};cursor:pointer;transition:all .15s">${c}</button>`;
   const allBtn = (fn) => `<button onclick="${fn}('__all',this)" style="font-size:10px;padding:3px 10px;border-radius:4px;border:1.5px solid #6b6b88;background:#6b6b88;color:#fff;cursor:pointer">Всі</button>`;
 
+  // Trash keyword filter — жорсткий
+  function isCleanKw(r) {
+    if (!r.keyword) return false;
+    const w = r.keyword.trim().toLowerCase();
+    if (w.replace(/\s/g,'').length < 5) return false;     // менше 5 символів
+    if (/^[\d\s\-_.\/]+$/.test(w)) return false;          // тільки цифри/символи
+    if (/^[a-z]{1,4}(\s|$)/.test(w) && !/[а-яіїєёa-z]{5}/.test(w)) return false; // короткі латинські без значення
+    if (r.category === 'brand') return false;              // відсікаємо бренди
+    // Відсікаємо очевидне сміття: одне слово < 5 букв без голосних
+    const noVowels = w.replace(/[аеєиіїоуюяaeiou]/gi,'');
+    if (noVowels.length === w.replace(/\s/g,'').length && w.length < 8) return false;
+    return true;
+  }
+
+  // Store data refs for click handlers
+  window._chartData = {};
+  window._CC = CC;
+  window._charts2 = {};
+
+  // Build HTML — заголовки оновлюються динамічно
   document.getElementById('chartsPanel').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
       <div class="chart-card">
-        <div class="chart-title">Топ-15 категорій по трафіку</div>
+        <div class="chart-title" id="titleCat">Топ категорій по трафіку</div>
         <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">${comps.map(c=>cBtn(c,'filterCat')).join('')}</div>
-        <div style="position:relative;height:340px"><canvas id="chCat" role="img" aria-label="Топ категорій"></canvas></div>
+        <div style="position:relative;height:380px"><canvas id="chCat" role="img" aria-label="Топ категорій"></canvas></div>
       </div>
       <div class="chart-card">
-        <div class="chart-title">Топ-15 продуктових сторінок</div>
+        <div class="chart-title" id="titleProd">Топ продуктових сторінок</div>
         <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">${comps.map(c=>cBtn(c,'filterProd')).join('')}</div>
-        <div style="position:relative;height:340px"><canvas id="chProd" role="img" aria-label="Топ продуктів"></canvas></div>
+        <div style="position:relative;height:380px"><canvas id="chProd" role="img" aria-label="Топ продуктів"></canvas></div>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
@@ -791,7 +811,7 @@ function buildCharts(pages, keywords) {
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">${Object.entries(PT_C).map(([k,v])=>`<span style="font-size:10px;color:#6b6b88;display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;background:${v};border-radius:2px;display:inline-block"></span>${k}</span>`).join('')}</div>
       </div>
       <div class="chart-card">
-        <div class="chart-title">Топ-20 ключів по об'єму (без сміттєвих)</div>
+        <div class="chart-title" id="titleKw">Топ ключів по об'єму (без сміттєвих)</div>
         <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">${allBtn('filterKw')}${comps.map(c=>cBtn(c,'filterKw')).join('')}</div>
         <div style="position:relative;height:260px"><canvas id="chKw" role="img" aria-label="Топ ключів"></canvas></div>
       </div>
@@ -804,47 +824,98 @@ function buildCharts(pages, keywords) {
       </div>
     </div>`;
 
-  window._CC = CC; window._charts2 = {};
-
-  function hBar(id, data, labelFn, colorFn, ttFn) {
+  // Clickable bar chart — при кліку відкриває URL
+  function hBarClickable(id, data, labelFn, urlFn, colorFn, ttFn, volFn) {
     if (window._charts2[id]) window._charts2[id].destroy();
-    window._charts2[id] = new Chart(document.getElementById(id), {
+    window._chartData[id] = data;
+    const chart = new Chart(document.getElementById(id), {
       type:'bar',
-      data:{ labels: data.map(labelFn), datasets:[{ data: data.map(r=>parseInt(r.traffic)||0), backgroundColor: data.map(colorFn) }] },
-      options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: (ctx) => ttFn(ctx, data[ctx.dataIndex]) }}},
-        scales:{ x:{ ticks:{color:'#6b6b88',font:{size:10},callback:tFmt}, grid:{color:'rgba(42,42,56,.5)'}},
-                 y:{ ticks:{color:'#9090aa',font:{size:10}}, grid:{color:'rgba(42,42,56,.3)'}}}}
+      data:{
+        labels: data.map(labelFn),
+        datasets:[{ data: data.map(r => volFn ? (parseInt(r.volume)||0) : (parseInt(r.traffic)||0)), backgroundColor: data.map(colorFn) }]
+      },
+      options:{
+        indexAxis:'y', responsive:true, maintainAspectRatio:false,
+        onClick: (evt, els) => {
+          if (els.length > 0) {
+            const r = data[els[0].index];
+            const url = urlFn(r);
+            if (url) window.open(url.startsWith('http')?url:'https://'+url, '_blank');
+          }
+        },
+        plugins:{
+          legend:{display:false},
+          tooltip:{ callbacks:{ label: (ctx) => ttFn(ctx, data[ctx.dataIndex]) }}
+        },
+        scales:{
+          x:{ ticks:{color:'#6b6b88',font:{size:10},callback:tFmt}, grid:{color:'rgba(42,42,56,.5)'}},
+          y:{ ticks:{color:'#00d4ff',font:{size:10},
+            // Make labels look clickable
+          }, grid:{color:'rgba(42,42,56,.3)'}}
+        },
+        // cursor pointer on hover
+        onHover: (evt, els) => {
+          evt.native.target.style.cursor = els.length > 0 ? 'pointer' : 'default';
+        }
+      }
     });
+    window._charts2[id] = chart;
   }
 
   function buildCat(comp) {
-    const d = pages.filter(r=>r.page_type==='category'&&(comp==='__all'||r.competitor===comp))
-      .sort((a,b)=>(parseInt(b.traffic)||0)-(parseInt(a.traffic)||0)).slice(0,15);
-    hBar('chCat', d, r=>urlToName(r.url), r=>(CC[r.competitor]||'#888')+'cc',
-      (ctx,r)=>` ${tFmt(ctx.raw)} · ${r.competitor}`);
+    const d = pages
+      .filter(r => r.page_type==='category' && (comp==='__all'||r.competitor===comp))
+      .sort((a,b) => (parseInt(b.traffic)||0)-(parseInt(a.traffic)||0))
+      .slice(0,15);
+    document.getElementById('titleCat').textContent = `Топ-${d.length} категорій по трафіку`;
+    hBarClickable('chCat', d,
+      r => urlToName(r.url),
+      r => r.url.startsWith('http') ? r.url : 'https://'+r.url,
+      r => (CC[r.competitor]||'#888')+'cc',
+      (ctx,r) => ` ${tFmt(ctx.raw)} · ${r.competitor} — клік щоб відкрити`,
+      false
+    );
     highlightBtn('chCat',comp,CC);
   }
 
   function buildProd(comp) {
-    const d = pages.filter(r=>r.page_type==='product'&&(comp==='__all'||r.competitor===comp))
-      .sort((a,b)=>(parseInt(b.traffic)||0)-(parseInt(a.traffic)||0)).slice(0,15);
-    hBar('chProd', d, r=>urlToName(r.url), r=>(CC[r.competitor]||'#888')+'cc',
-      (ctx,r)=>` ${tFmt(ctx.raw)} · ${r.competitor} · ${r.url}`);
+    const d = pages
+      .filter(r => r.page_type==='product' && (comp==='__all'||r.competitor===comp))
+      .sort((a,b) => (parseInt(b.traffic)||0)-(parseInt(a.traffic)||0))
+      .slice(0,15);
+    document.getElementById('titleProd').textContent = `Топ-${d.length} продуктових сторінок`;
+    hBarClickable('chProd', d,
+      r => {
+        // For Eva pr-pages show full path, for others show url slug
+        try {
+          const path = new URL(r.url.startsWith('http')?r.url:'https://'+r.url).pathname;
+          return path.split('/').filter(Boolean).slice(-1)[0] || path;
+        } catch { return r.url.slice(0,30); }
+      },
+      r => r.url.startsWith('http') ? r.url : 'https://'+r.url,
+      r => (CC[r.competitor]||'#888')+'cc',
+      (ctx,r) => ` ${tFmt(ctx.raw)} · ${r.competitor} · ${r.url} — клік щоб відкрити`,
+      false
+    );
     highlightBtn('chProd',comp,CC);
   }
 
   function buildKw(comp) {
-    const clean = keywords.filter(r => {
-      if (comp!=='__all' && r.competitor!==comp) return false;
-      if (!r.keyword) return false;
-      const w = r.keyword.trim();
-      if (w.replace(/\s/g,'').length < 4) return false;
-      if (r.category==='brand') return false;
-      return true;
-    }).sort((a,b)=>(parseInt(b.volume)||0)-(parseInt(a.volume)||0)).slice(0,20);
-    hBar('chKw', clean, r=>r.keyword, r=>(CC[r.competitor]||'#888')+'cc',
-      (ctx,r)=>` ${tFmt(ctx.raw)} · ${r.competitor} · поз.${r.position||'?'}`);
+    const clean = keywords
+      .filter(r => {
+        if (comp!=='__all' && r.competitor!==comp) return false;
+        return isCleanKw(r);
+      })
+      .sort((a,b) => (parseInt(b.volume)||0)-(parseInt(a.volume)||0))
+      .slice(0,20);
+    document.getElementById('titleKw').textContent = `Топ-${clean.length} ключів по об'єму (без сміттєвих)`;
+    hBarClickable('chKw', clean,
+      r => r.keyword,
+      r => `https://www.google.com/search?q=${encodeURIComponent(r.keyword)}`,
+      r => (CC[r.competitor]||'#888')+'cc',
+      (ctx,r) => ` ${tFmt(ctx.raw)} · ${r.competitor} · поз.${r.position||'?'} — клік → Google`,
+      true  // use volume
+    );
     highlightBtn('chKw',comp,CC);
   }
 
