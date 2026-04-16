@@ -816,10 +816,15 @@ function buildCharts(pages, keywords) {
         <div style="position:relative;height:260px"><canvas id="chKw" role="img" aria-label="Топ ключів"></canvas></div>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:16px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
       <div class="chart-card">
-        <div class="chart-title">Об'єм пошуку по категоріях food / nonfood / brand — конкуренти</div>
-        <div style="position:relative;height:220px"><canvas id="chCatKw" role="img" aria-label="Об'єм по категоріях"></canvas></div>
+        <div class="chart-title">Об'єм пошуку по категоріях ключів — конкуренти</div>
+        <div style="position:relative;height:240px"><canvas id="chCatKw" role="img" aria-label="Об'єм по категоріях"></canvas></div>
+        <div style="display:flex;gap:14px;margin-top:10px;flex-wrap:wrap">${comps.map(c=>`<span style="font-size:10px;color:#6b6b88;display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:${CC[c]};border-radius:2px;display:inline-block"></span>${c}</span>`).join('')}</div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Трафік по категоріях ключів — конкуренти</div>
+        <div style="position:relative;height:240px"><canvas id="chCatTraf" role="img" aria-label="Трафік по категоріях ключів"></canvas></div>
         <div style="display:flex;gap:14px;margin-top:10px;flex-wrap:wrap">${comps.map(c=>`<span style="font-size:10px;color:#6b6b88;display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:${CC[c]};border-radius:2px;display:inline-block"></span>${c}</span>`).join('')}</div>
       </div>
     </div>`;
@@ -954,14 +959,30 @@ function buildCharts(pages, keywords) {
   });
 
   // Grouped — об'єм ключів по категоріях
+  const kwCats = ['food','nonfood','brand','other'];
   new Chart(document.getElementById('chCatKw'), {
     type:'bar',
-    data:{ labels:['food','nonfood','brand'], datasets: comps.map(c=>({
+    data:{ labels: kwCats, datasets: comps.map(c=>({
       label:c, backgroundColor:(CC[c]||'#888')+'cc',
-      data:['food','nonfood','brand'].map(cat=>keywords.filter(r=>r.competitor===c&&r.category===cat).reduce((s,r)=>s+(parseInt(r.volume)||0),0))
+      data: kwCats.map(cat=>keywords.filter(r=>r.competitor===c&&r.category===cat).reduce((s,r)=>s+(parseInt(r.volume)||0),0))
     }))},
     options:{ responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{display:false} },
+      plugins:{ legend:{display:false},
+        tooltip:{ callbacks:{ label: ctx => ` ${tFmt(ctx.raw)} пошуків · ${ctx.dataset.label}` }}},
+      scales:{ x:{ticks:{color:'#6b6b88',font:{size:12}},grid:{color:'rgba(42,42,56,.5)'}},
+               y:{ticks:{color:'#6b6b88',font:{size:10},callback:tFmt},grid:{color:'rgba(42,42,56,.5)'}}}}
+  });
+
+  // Grouped — трафік ключів по категоріях
+  new Chart(document.getElementById('chCatTraf'), {
+    type:'bar',
+    data:{ labels: kwCats, datasets: comps.map(c=>({
+      label:c, backgroundColor:(CC[c]||'#888')+'cc',
+      data: kwCats.map(cat=>keywords.filter(r=>r.competitor===c&&r.category===cat).reduce((s,r)=>s+(parseInt(r.traffic)||0),0))
+    }))},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false},
+        tooltip:{ callbacks:{ label: ctx => ` ${tFmt(ctx.raw)} трафіку · ${ctx.dataset.label}` }}},
       scales:{ x:{ticks:{color:'#6b6b88',font:{size:12}},grid:{color:'rgba(42,42,56,.5)'}},
                y:{ticks:{color:'#6b6b88',font:{size:10},callback:tFmt},grid:{color:'rgba(42,42,56,.5)'}}}}
   });
