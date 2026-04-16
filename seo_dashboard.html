@@ -450,10 +450,12 @@ td {
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<script> = '1COlbKcnpKLiqc9mJkfjv_wEOTGvDaDq9gtdbS55m0gM';
+<script>
+const SHEET_ID = '1COlbKcnpKLiqc9mJkfjv_wEOTGvDaDq9gtdbS55m0gM';
 const SHEETS = {
   pages_all:           { title: 'Всі сторінки конкурентів', type: 'pages' },
   pages_new:           { title: 'Нові сторінки', type: 'pages_new' },
+  pages_type_summary:  { title: 'Зведення по типах сторінок', type: 'summary' },
   keywords_all:        { title: 'Всі ключові слова', type: 'keywords' },
   keywords_top_volume: { title: 'Топ ключів за об\'ємом пошуку', type: 'keywords' },
 };
