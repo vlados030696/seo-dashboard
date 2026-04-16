@@ -337,9 +337,20 @@ td {
 
 /* CHARTS */
 .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; }
-.chart-title { font-size: 11px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 14px; }
+.chart-title { font-size: 11px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 12px; }
 
+/* SUMMARY */
+.summary-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:14px; padding:20px; }
+.summary-card { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:14px 16px; }
+.summary-comp { font-size:11px; font-weight:700; color:var(--muted); letter-spacing:.1em; text-transform:uppercase; margin-bottom:10px; }
+.summary-row { display:flex; align-items:center; justify-content:space-between; padding:5px 0; border-bottom:0.5px solid rgba(42,42,56,.5); }
+.summary-row:last-child { border-bottom:none; }
+.summary-nums { display:flex; gap:14px; font-size:11px; color:var(--muted); }
+.summary-nums .hi { color:var(--text); font-weight:500; }
+/* EMPTY */
+.empty { padding: 50px; text-align: center; color: var(--muted); font-size: 12px; }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 </head>
 <body>
 <div class="container">
@@ -387,7 +398,7 @@ td {
     <button class="tab" onclick="showCharts(this)">Графіки</button>
   </div>
 
-  <div class="filters" id="filters">
+  <div class="filters" id="filtersBar">
     <span class="filter-label">Конкурент:</span>
     <select class="filter-select" id="compFilter" onchange="applyFilters()">
       <option value="">Всі</option>
@@ -405,39 +416,16 @@ td {
       <option value="">Всі типи</option>
     </select>
     <input class="search-input" id="searchInput" placeholder="Пошук по URL або ключу..." oninput="applyFilters()">
+    <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);cursor:pointer;user-select:none">
+      <input type="checkbox" id="filterTrash" onchange="applyFilters()" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)">
+      Прибрати сміттєві ключі
+    </label>
     <span class="filter-label" id="filteredCount" style="margin-left:auto"></span>
   </div>
 
-  <div id="chartsPanel" style="display:none">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-      <div class="chart-card">
-        <div class="chart-title">Трафік по сторінках — розподіл по конкурентах</div>
-        <div style="position:relative;height:260px"><canvas id="ch1" role="img" aria-label="Трафік конкурентів по типах сторінок"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">Кількість сторінок по типах</div>
-        <div style="position:relative;height:260px"><canvas id="ch2" role="img" aria-label="Кількість сторінок по типах"></canvas></div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-      <div class="chart-card">
-        <div class="chart-title">Об'єм пошуку ключів по категоріях (food / nonfood / brand / other)</div>
-        <div style="position:relative;height:260px"><canvas id="ch3" role="img" aria-label="Обєм ключів по категоріях"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">Кількість ключів по конкурентах і категоріях</div>
-        <div style="position:relative;height:260px"><canvas id="ch4" role="img" aria-label="Кількість ключів по конкурентах"></canvas></div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:16px">
-      <div class="chart-card">
-        <div class="chart-title">Топ-15 сторінок по трафіку (всі конкуренти)</div>
-        <div style="position:relative;height:360px"><canvas id="ch5" role="img" aria-label="Топ сторінки по трафіку"></canvas></div>
-      </div>
-    </div>
-  </div>
+  <div id="chartsPanel" style="display:none"></div>
 
-  <div class="table-wrap" id="tableWrap">
+  <div id="tableWrap" class="table-wrap">
     <div class="table-header">
       <span class="table-title" id="tableTitle">Завантаження...</span>
       <span class="table-count" id="tableCount"></span>
@@ -446,10 +434,9 @@ td {
       <div class="loading"><div class="spinner"></div> Завантажуємо дані з Google Sheets...</div>
     </div>
     <div class="pagination" id="pagination"></div>
-  </div><!-- /table-wrap -->
+  </div><!-- /tableWrap -->
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
 const SHEET_ID = '1COlbKcnpKLiqc9mJkfjv_wEOTGvDaDq9gtdbS55m0gM';
 const SHEETS = {
@@ -576,7 +563,7 @@ function renderTable(data, type) {
       ).join('')}</tr></thead>
       <tbody>${page.map(row => `<tr>
         <td><span class="comp-badge badge-${getCompColor(row.competitor)}">${row.competitor||'—'}</span></td>
-        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${row.keyword||'—'}</td>
+        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="https://www.google.com/search?q=${encodeURIComponent(row.keyword||'')}" target="_blank" style="color:inherit;text-decoration:none" title="Пошук в Google">${row.keyword||'—'}</a></td>
         <td>${fmtCat(row.category)}</td>
         <td class="num">${row.position||'—'}</td>
         <td class="num">${fmtNum(row.volume)}</td>
@@ -623,12 +610,24 @@ function sortBy(col) {
   renderTable(filteredData, SHEETS[currentSheet].type);
 }
 
+function isTrashKeyword(kw) {
+  if (!kw) return true;
+  const w = kw.trim().toLowerCase();
+  // Занадто короткі (менше 4 символів без пробілів)
+  if (w.replace(/\s/g,'').length < 4) return true;
+  // Тільки цифри або символи
+  if (/^[\d\s\-_.]+$/.test(w)) return true;
+  // Бренди конкурентів (визначаємо динамічно з даних)
+  return false;
+}
+
 function applyFilters() {
-  const comp     = document.getElementById('compFilter').value;
-  const cat      = document.getElementById('catFilter').value;
-  const pageType = document.getElementById('pageTypeFilter').value;
-  const search   = document.getElementById('searchInput').value.toLowerCase();
-  const isPages  = SHEETS[currentSheet].type !== 'keywords';
+  const comp      = document.getElementById('compFilter').value;
+  const cat       = document.getElementById('catFilter').value;
+  const pageType  = document.getElementById('pageTypeFilter').value;
+  const search    = document.getElementById('searchInput').value.toLowerCase();
+  const noTrash   = document.getElementById('filterTrash').checked;
+  const isPages   = SHEETS[currentSheet].type !== 'keywords';
 
   filteredData = currentData.filter(row => {
     if (comp     && row.competitor !== comp) return false;
@@ -637,6 +636,12 @@ function applyFilters() {
     if (search) {
       const hay = (row.url || row.keyword || '').toLowerCase();
       if (!hay.includes(search)) return false;
+    }
+    // Фільтр сміттєвих ключів
+    if (!isPages && noTrash) {
+      if (isTrashKeyword(row.keyword)) return false;
+      // Відсікаємо brand категорію якщо активний фільтр
+      if (row.category === 'brand') return false;
     }
     return true;
   });
@@ -719,7 +724,7 @@ async function switchTab(sheet, btn) {
   btn.classList.add('active');
   document.getElementById('chartsPanel').style.display = 'none';
   document.getElementById('tableWrap').style.display   = '';
-  document.getElementById('filters').style.display     = '';
+  document.getElementById('filtersBar').style.display  = '';
   currentSheet = sheet;
   sortCol = null;
   currentPage = 1;
@@ -729,10 +734,170 @@ async function switchTab(sheet, btn) {
   await loadSheet(sheet);
 }
 
-// Init — load all sheets for stats silently
+function urlToName(url) {
+  try {
+    const path = new URL(url.startsWith('http')?url:'https://'+url).pathname;
+    const parts = path.split('/').filter(Boolean);
+    const name = parts.reverse().find(p => !/^\d+$/.test(p) && p.length > 2) || parts[0] || url;
+    return name.replace(/-/g,' ').replace(/_/g,' ').slice(0,35);
+  } catch { return url.slice(0,35); }
+}
+
+async function showCharts(btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('chartsPanel').style.display = 'block';
+  document.getElementById('tableWrap').style.display   = 'none';
+  document.getElementById('filtersBar').style.display  = 'none';
+  if (window._chartsBuilt) return;
+  window._chartsBuilt = true;
+  document.getElementById('chartsPanel').innerHTML =
+    '<div class="loading"><div class="spinner"></div> Завантажуємо дані для графіків...</div>';
+  try {
+    const [pages, keywords] = await Promise.all([fetchCSV('pages_all'), fetchCSV('keywords_all')]);
+    buildCharts(pages, keywords);
+  } catch(e) {
+    document.getElementById('chartsPanel').innerHTML = `<div class="error-msg">Помилка: ${e.message}</div>`;
+  }
+}
+
+function buildCharts(pages, keywords) {
+  const comps = [...new Set(pages.map(r=>r.competitor).filter(Boolean))].sort();
+  const CC = {};
+  const palette = ['#00e5a0','#7c6af7','#ff6b6b','#00d4ff'];
+  comps.forEach((c,i) => CC[c] = palette[i%palette.length]);
+  const PT_C = {product:'#00e5a0',category:'#7c6af7',subcategory:'#9980ff',section:'#6b6b88',promo:'#fda110',blog:'#00d4ff',brand_page:'#ffc800',main:'#ff6b6b',other:'#444'};
+  const tFmt = v => v>=1000000?(v/1000000).toFixed(1)+'M':v>=1000?(v/1000).toFixed(0)+'K':String(v);
+  const cBtn = (c,fn) => `<button onclick="${fn}('${c}',this)" style="font-size:10px;padding:3px 10px;border-radius:4px;border:1.5px solid ${CC[c]||'#888'};background:transparent;color:${CC[c]||'#888'};cursor:pointer;transition:all .15s">${c}</button>`;
+  const allBtn = (fn) => `<button onclick="${fn}('__all',this)" style="font-size:10px;padding:3px 10px;border-radius:4px;border:1.5px solid #6b6b88;background:#6b6b88;color:#fff;cursor:pointer">Всі</button>`;
+
+  document.getElementById('chartsPanel').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div class="chart-card">
+        <div class="chart-title">Топ-15 категорій по трафіку</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">${comps.map(c=>cBtn(c,'filterCat')).join('')}</div>
+        <div style="position:relative;height:340px"><canvas id="chCat" role="img" aria-label="Топ категорій"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Топ-15 продуктових сторінок</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">${comps.map(c=>cBtn(c,'filterProd')).join('')}</div>
+        <div style="position:relative;height:340px"><canvas id="chProd" role="img" aria-label="Топ продуктів"></canvas></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div class="chart-card">
+        <div class="chart-title">Трафік по типах сторінок — конкуренти</div>
+        <div style="position:relative;height:260px"><canvas id="chPT" role="img" aria-label="Трафік по типах"></canvas></div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">${Object.entries(PT_C).map(([k,v])=>`<span style="font-size:10px;color:#6b6b88;display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;background:${v};border-radius:2px;display:inline-block"></span>${k}</span>`).join('')}</div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Топ-20 ключів по об'єму (без сміттєвих)</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">${allBtn('filterKw')}${comps.map(c=>cBtn(c,'filterKw')).join('')}</div>
+        <div style="position:relative;height:260px"><canvas id="chKw" role="img" aria-label="Топ ключів"></canvas></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:16px">
+      <div class="chart-card">
+        <div class="chart-title">Об'єм пошуку по категоріях food / nonfood / brand — конкуренти</div>
+        <div style="position:relative;height:220px"><canvas id="chCatKw" role="img" aria-label="Об'єм по категоріях"></canvas></div>
+        <div style="display:flex;gap:14px;margin-top:10px;flex-wrap:wrap">${comps.map(c=>`<span style="font-size:10px;color:#6b6b88;display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:${CC[c]};border-radius:2px;display:inline-block"></span>${c}</span>`).join('')}</div>
+      </div>
+    </div>`;
+
+  window._CC = CC; window._charts2 = {};
+
+  function hBar(id, data, labelFn, colorFn, ttFn) {
+    if (window._charts2[id]) window._charts2[id].destroy();
+    window._charts2[id] = new Chart(document.getElementById(id), {
+      type:'bar',
+      data:{ labels: data.map(labelFn), datasets:[{ data: data.map(r=>parseInt(r.traffic)||0), backgroundColor: data.map(colorFn) }] },
+      options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: (ctx) => ttFn(ctx, data[ctx.dataIndex]) }}},
+        scales:{ x:{ ticks:{color:'#6b6b88',font:{size:10},callback:tFmt}, grid:{color:'rgba(42,42,56,.5)'}},
+                 y:{ ticks:{color:'#9090aa',font:{size:10}}, grid:{color:'rgba(42,42,56,.3)'}}}}
+    });
+  }
+
+  function buildCat(comp) {
+    const d = pages.filter(r=>r.page_type==='category'&&(comp==='__all'||r.competitor===comp))
+      .sort((a,b)=>(parseInt(b.traffic)||0)-(parseInt(a.traffic)||0)).slice(0,15);
+    hBar('chCat', d, r=>urlToName(r.url), r=>(CC[r.competitor]||'#888')+'cc',
+      (ctx,r)=>` ${tFmt(ctx.raw)} · ${r.competitor}`);
+    highlightBtn('chCat',comp,CC);
+  }
+
+  function buildProd(comp) {
+    const d = pages.filter(r=>r.page_type==='product'&&(comp==='__all'||r.competitor===comp))
+      .sort((a,b)=>(parseInt(b.traffic)||0)-(parseInt(a.traffic)||0)).slice(0,15);
+    hBar('chProd', d, r=>urlToName(r.url), r=>(CC[r.competitor]||'#888')+'cc',
+      (ctx,r)=>` ${tFmt(ctx.raw)} · ${r.competitor} · ${r.url}`);
+    highlightBtn('chProd',comp,CC);
+  }
+
+  function buildKw(comp) {
+    const clean = keywords.filter(r => {
+      if (comp!=='__all' && r.competitor!==comp) return false;
+      if (!r.keyword) return false;
+      const w = r.keyword.trim();
+      if (w.replace(/\s/g,'').length < 4) return false;
+      if (r.category==='brand') return false;
+      return true;
+    }).sort((a,b)=>(parseInt(b.volume)||0)-(parseInt(a.volume)||0)).slice(0,20);
+    hBar('chKw', clean, r=>r.keyword, r=>(CC[r.competitor]||'#888')+'cc',
+      (ctx,r)=>` ${tFmt(ctx.raw)} · ${r.competitor} · поз.${r.position||'?'}`);
+    highlightBtn('chKw',comp,CC);
+  }
+
+  function highlightBtn(chartId, activeComp, cc) {
+    const card = document.getElementById(chartId).closest('.chart-card');
+    if (!card) return;
+    card.querySelectorAll('button').forEach(b => {
+      const c = b.textContent.trim();
+      const color = c==='Всі'?'#6b6b88':(cc[c]||'#888');
+      const isActive = (activeComp==='__all'&&c==='Всі')||(activeComp===c);
+      b.style.background = isActive ? color : 'transparent';
+      b.style.color      = isActive ? (c==='Всі'?'#fff':'#000') : color;
+    });
+  }
+
+  window.filterCat  = (c,_) => buildCat(c);
+  window.filterProd = (c,_) => buildProd(c);
+  window.filterKw   = (c,_) => buildKw(c);
+
+  buildCat(comps[0]);
+  buildProd(comps[0]);
+  buildKw('__all');
+
+  // Stacked bar — трафік по типах
+  const ptypes = Object.keys(PT_C);
+  new Chart(document.getElementById('chPT'), {
+    type:'bar',
+    data:{ labels:comps, datasets: ptypes.map(pt=>({
+      label:pt, backgroundColor: PT_C[pt]+'cc',
+      data: comps.map(c=>pages.filter(r=>r.competitor===c&&r.page_type===pt).reduce((s,r)=>s+(parseInt(r.traffic)||0),0))
+    }))},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{ x:{stacked:true,ticks:{color:'#6b6b88',font:{size:11}},grid:{color:'rgba(42,42,56,.5)'}},
+               y:{stacked:true,ticks:{color:'#6b6b88',font:{size:10},callback:tFmt},grid:{color:'rgba(42,42,56,.5)'}}}}
+  });
+
+  // Grouped — об'єм ключів по категоріях
+  new Chart(document.getElementById('chCatKw'), {
+    type:'bar',
+    data:{ labels:['food','nonfood','brand'], datasets: comps.map(c=>({
+      label:c, backgroundColor:(CC[c]||'#888')+'cc',
+      data:['food','nonfood','brand'].map(cat=>keywords.filter(r=>r.competitor===c&&r.category===cat).reduce((s,r)=>s+(parseInt(r.volume)||0),0))
+    }))},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{ x:{ticks:{color:'#6b6b88',font:{size:12}},grid:{color:'rgba(42,42,56,.5)'}},
+               y:{ticks:{color:'#6b6b88',font:{size:10},callback:tFmt},grid:{color:'rgba(42,42,56,.5)'}}}}
+  });
+}
+
 async function init() {
   await loadSheet('pages_all');
-  // load other sheets for stats counters
   try {
     const pn = await fetchCSV('pages_new');
     document.getElementById('stat-new').textContent = fmtNum(pn.length);
@@ -741,218 +906,6 @@ async function init() {
     const ka = await fetchCSV('keywords_all');
     document.getElementById('stat-keys').textContent = fmtNum(ka.length);
   } catch(e) {}
-}
-
-async function showCharts(btn) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById('chartsPanel').style.display = 'block';
-  document.getElementById('tableWrap').style.display   = 'none';
-  document.getElementById('filters').style.display     = 'none';
-
-  if (window._chartsBuilt) return;
-  window._chartsBuilt = true;
-
-  document.getElementById('chartsPanel').innerHTML =
-    '<div class="loading"><div class="spinner"></div> Завантажуємо дані для графіків...</div>';
-
-  try {
-    const [pages, keywords] = await Promise.all([
-      fetchCSV('pages_all'),
-      fetchCSV('keywords_all')
-    ]);
-    buildCharts(pages, keywords);
-  } catch(e) {
-    document.getElementById('chartsPanel').innerHTML =
-      `<div class="error-msg">Не вдалося завантажити дані: ${e.message}</div>`;
-  }
-}
-
-function urlToName(url) {
-  try {
-    const path = new URL(url.startsWith('http') ? url : 'https://'+url).pathname;
-    const parts = path.split('/').filter(Boolean);
-    // Take last meaningful segment, strip numeric IDs
-    const name = parts.reverse().find(p => !/^\d+$/.test(p) && p.length > 2) || parts[0] || url;
-    return name.replace(/-/g,' ').replace(/_/g,' ').slice(0,40);
-  } catch { return url.slice(0,40); }
-}
-
-function mkChart(id, type, labels, datasets, opts={}) {
-  const base = {
-    responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { ticks: { color: '#6b6b88', font: { size: 10 } }, grid: { color: 'rgba(42,42,56,.5)' } },
-      y: { ticks: { color: '#6b6b88', font: { size: 10 }, callback: v => v>=1000000?(v/1000000).toFixed(1)+'M':v>=1000?(v/1000).toFixed(0)+'K':v }, grid: { color: 'rgba(42,42,56,.5)' } }
-    }
-  };
-  return new Chart(document.getElementById(id), { type, data: { labels, datasets }, options: Object.assign({}, base, opts) });
-}
-
-function buildCharts(pages, keywords) {
-  const comps = [...new Set(pages.map(r => r.competitor).filter(Boolean))].sort();
-  const COMP_COLORS = { [comps[0]]: '#00e5a0', [comps[1]]: '#7c6af7', [comps[2]]: '#ff6b6b', [comps[3]]: '#00d4ff' };
-  const PT_COLORS = { product:'#00e5a0', category:'#7c6af7', subcategory:'#9980ff', section:'#6b6b88', promo:'#fda110', blog:'#00d4ff', brand_page:'#ffc800', main:'#ff6b6b', other:'#444' };
-  const tFmt = v => v>=1000000?(v/1000000).toFixed(1)+'M':v>=1000?(v/1000).toFixed(0)+'K':v;
-
-  // Panel HTML
-  document.getElementById('chartsPanel').innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-      <div class="chart-card">
-        <div class="chart-title">Топ-15 категорій по трафіку — по конкурентах</div>
-        <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
-          ${comps.map(c=>`<button class="fbtn active" onclick="filterTopCat('${c}',this)" style="font-size:10px;padding:3px 10px;border-radius:4px;border:1px solid ${COMP_COLORS[c]||'#888'};background:transparent;color:${COMP_COLORS[c]||'#888'};cursor:pointer">${c}</button>`).join('')}
-        </div>
-        <div style="position:relative;height:340px"><canvas id="ch_cats" role="img" aria-label="Топ категорій"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">Топ-15 продуктових сторінок по трафіку</div>
-        <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
-          ${comps.map(c=>`<button class="fbtn active" onclick="filterTopProd('${c}',this)" style="font-size:10px;padding:3px 10px;border-radius:4px;border:1px solid ${COMP_COLORS[c]||'#888'};background:transparent;color:${COMP_COLORS[c]||'#888'};cursor:pointer">${c}</button>`).join('')}
-        </div>
-        <div style="position:relative;height:340px"><canvas id="ch_prods" role="img" aria-label="Топ продуктів"></canvas></div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-      <div class="chart-card">
-        <div class="chart-title">Трафік по типах сторінок — порівняння конкурентів</div>
-        <div style="position:relative;height:280px"><canvas id="ch_ptypes" role="img" aria-label="Трафік по типах"></canvas></div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
-          ${Object.entries(PT_COLORS).map(([k,v])=>`<span style="font-size:10px;color:#6b6b88;display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;background:${v};border-radius:2px;display:inline-block"></span>${k}</span>`).join('')}
-        </div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">Топ-20 ключів по об'єму пошуку</div>
-        <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
-          <button onclick="filterKwComp('all',this)" style="font-size:10px;padding:3px 10px;border-radius:4px;border:1px solid #6b6b88;background:#6b6b88;color:#fff;cursor:pointer">Всі</button>
-          ${comps.map(c=>`<button onclick="filterKwComp('${c}',this)" style="font-size:10px;padding:3px 10px;border-radius:4px;border:1px solid ${COMP_COLORS[c]||'#888'};background:transparent;color:${COMP_COLORS[c]||'#888'};cursor:pointer">${c}</button>`).join('')}
-        </div>
-        <div style="position:relative;height:280px"><canvas id="ch_kws" role="img" aria-label="Топ ключів"></canvas></div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:16px">
-      <div class="chart-card">
-        <div class="chart-title">Об'єм пошуку топ-ключів по категоріях food / nonfood / brand</div>
-        <div style="position:relative;height:240px"><canvas id="ch_cats_kw" role="img" aria-label="Ключі по категоріях"></canvas></div>
-        <div style="display:flex;gap:16px;margin-top:10px;font-size:10px;color:#6b6b88;flex-wrap:wrap">
-          ${comps.map(c=>`<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:${COMP_COLORS[c]};border-radius:2px;display:inline-block"></span>${c}</span>`).join('')}
-        </div>
-      </div>
-    </div>`;
-
-  // ---- CH_CATS: Топ-15 категорій по трафіку (активний конкурент) ----
-  window._pages = pages;
-  window._keywords = keywords;
-  window._comps = comps;
-  window._COMP_COLORS = COMP_COLORS;
-  window._PT_COLORS = PT_COLORS;
-  window._charts = {};
-
-  function buildTopCats(comp) {
-    const data = pages
-      .filter(r => r.page_type === 'category' && (!comp || r.competitor === comp))
-      .sort((a,b) => (parseInt(b.traffic)||0)-(parseInt(a.traffic)||0))
-      .slice(0,15);
-    const labels = data.map(r => urlToName(r.url));
-    const colors = data.map(r => (COMP_COLORS[r.competitor]||'#888')+'cc');
-    if (window._charts.cats) window._charts.cats.destroy();
-    window._charts.cats = new Chart(document.getElementById('ch_cats'), {
-      type:'bar', data:{ labels, datasets:[{ data: data.map(r=>parseInt(r.traffic)||0), backgroundColor: colors }] },
-      options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: ctx => ` ${tFmt(ctx.raw)} · ${data[ctx.dataIndex].competitor}` }}},
-        scales:{ x:{ ticks:{color:'#6b6b88',font:{size:10},callback:tFmt}, grid:{color:'rgba(42,42,56,.5)'}}, y:{ticks:{color:'#9090aa',font:{size:10}},grid:{color:'rgba(42,42,56,.3)'}}}}
-    });
-  }
-
-  function buildTopProds(comp) {
-    const data = pages
-      .filter(r => r.page_type === 'product' && (!comp || r.competitor === comp))
-      .sort((a,b) => (parseInt(b.traffic)||0)-(parseInt(a.traffic)||0))
-      .slice(0,15);
-    const labels = data.map(r => urlToName(r.url));
-    const colors = data.map(r => (COMP_COLORS[r.competitor]||'#888')+'cc');
-    if (window._charts.prods) window._charts.prods.destroy();
-    window._charts.prods = new Chart(document.getElementById('ch_prods'), {
-      type:'bar', data:{ labels, datasets:[{ data: data.map(r=>parseInt(r.traffic)||0), backgroundColor: colors }] },
-      options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: ctx => ` ${tFmt(ctx.raw)} · ${data[ctx.dataIndex].competitor} · ${data[ctx.dataIndex].url}` }}},
-        scales:{ x:{ ticks:{color:'#6b6b88',font:{size:10},callback:tFmt}, grid:{color:'rgba(42,42,56,.5)'}}, y:{ticks:{color:'#9090aa',font:{size:10}},grid:{color:'rgba(42,42,56,.3)'}}}}
-    });
-  }
-
-  // Expose filter functions
-  window.filterTopCat = (comp, btn) => {
-    btn.closest('div').querySelectorAll('button').forEach(b => b.style.background='transparent');
-    btn.style.background = COMP_COLORS[comp]||'#888'; btn.style.color='#000';
-    buildTopCats(comp);
-  };
-  window.filterTopProd = (comp, btn) => {
-    btn.closest('div').querySelectorAll('button').forEach(b => b.style.background='transparent');
-    btn.style.background = COMP_COLORS[comp]||'#888'; btn.style.color='#000';
-    buildTopProds(comp);
-  };
-
-  buildTopCats(comps[0]);
-  buildTopProds(comps[0]);
-
-  // ---- CH_PTYPES: Трафік по типах — stacked по конкурентах ----
-  const ptypes = Object.keys(PT_COLORS);
-  const ptDatasets = ptypes.map(pt => ({
-    label: pt,
-    data: comps.map(c => pages.filter(r=>r.competitor===c&&r.page_type===pt).reduce((s,r)=>s+(parseInt(r.traffic)||0),0)),
-    backgroundColor: PT_COLORS[pt]+'cc'
-  }));
-  new Chart(document.getElementById('ch_ptypes'), {
-    type:'bar', data:{ labels:comps, datasets:ptDatasets },
-    options:{ responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{display:false} },
-      scales:{
-        x:{ stacked:true, ticks:{color:'#6b6b88',font:{size:11}}, grid:{color:'rgba(42,42,56,.5)'}},
-        y:{ stacked:true, ticks:{color:'#6b6b88',font:{size:10},callback:tFmt}, grid:{color:'rgba(42,42,56,.5)'}}
-      }}
-  });
-
-  // ---- CH_KWS: Топ-20 ключів по об'єму ----
-  function buildTopKws(comp) {
-    const data = keywords
-      .filter(r => !comp || comp==='all' || r.competitor===comp)
-      .sort((a,b)=>(parseInt(b.volume)||0)-(parseInt(a.volume)||0))
-      .slice(0,20);
-    const labels = data.map(r => r.keyword||'—');
-    const colors = data.map(r => (COMP_COLORS[r.competitor]||'#888')+'cc');
-    if (window._charts.kws) window._charts.kws.destroy();
-    window._charts.kws = new Chart(document.getElementById('ch_kws'), {
-      type:'bar', data:{ labels, datasets:[{ data: data.map(r=>parseInt(r.volume)||0), backgroundColor: colors }] },
-      options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: ctx => ` ${tFmt(ctx.raw)} · ${data[ctx.dataIndex].competitor} · поз.${data[ctx.dataIndex].position||'?'}` }}},
-        scales:{ x:{ ticks:{color:'#6b6b88',font:{size:10},callback:tFmt}, grid:{color:'rgba(42,42,56,.5)'}}, y:{ticks:{color:'#9090aa',font:{size:10}},grid:{color:'rgba(42,42,56,.3)'}}}}
-    });
-  }
-  window.filterKwComp = (comp, btn) => {
-    btn.closest('div').querySelectorAll('button').forEach(b => { b.style.background='transparent'; });
-    btn.style.background = comp==='all'?'#6b6b88':(COMP_COLORS[comp]||'#888');
-    btn.style.color = '#fff';
-    buildTopKws(comp);
-  };
-  buildTopKws('all');
-
-  // ---- CH_CATS_KW: Об'єм ключів по категоріях і конкурентах ----
-  const kwCats = ['food','nonfood','brand'];
-  const kwCatDatasets = comps.map(c => ({
-    label: c,
-    data: kwCats.map(cat => keywords.filter(r=>r.competitor===c&&r.category===cat).reduce((s,r)=>s+(parseInt(r.volume)||0),0)),
-    backgroundColor: (COMP_COLORS[c]||'#888')+'cc'
-  }));
-  new Chart(document.getElementById('ch_cats_kw'), {
-    type:'bar', data:{ labels: kwCats, datasets: kwCatDatasets },
-    options:{ responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{display:false} },
-      scales:{
-        x:{ ticks:{color:'#6b6b88',font:{size:12}}, grid:{color:'rgba(42,42,56,.5)'}},
-        y:{ ticks:{color:'#6b6b88',font:{size:10},callback:tFmt}, grid:{color:'rgba(42,42,56,.5)'}}
-      }}
-  });
 }
 
 init();
