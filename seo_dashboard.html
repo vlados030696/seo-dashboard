@@ -285,7 +285,19 @@ td {
 .pt-promo      { background: rgba(253,161,16,.12); color: var(--accent); border: 1px solid rgba(253,161,16,.3); }
 .pt-brand_page { background: rgba(255,200,0,.1); color: #ffc800; border: 1px solid rgba(255,200,0,.25); }
 .pt-main       { background: rgba(255,107,107,.1); color: var(--warn); border: 1px solid rgba(255,107,107,.2); }
-.pt-search     { background: rgba(107,107,136,.1); color: var(--muted); border: 1px solid rgba(107,107,136,.2); }
+.pt-service    { background: rgba(107,107,136,.1); color: var(--muted); border: 1px solid rgba(107,107,136,.2); }
+.pt-other      { background: rgba(42,42,56,.4); color: var(--muted); border: 1px solid rgba(42,42,56,.8); }
+
+/* SUMMARY TABLE */
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; padding: 20px; }
+.summary-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.summary-comp { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 12px; }
+.summary-row { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid rgba(42,42,56,.5); }
+.summary-row:last-child { border-bottom: none; }
+.summary-type { font-size: 11px; }
+.summary-nums { display: flex; gap: 16px; font-size: 11px; color: var(--muted); }
+.summary-nums span { font-variant-numeric: tabular-nums; }
+.summary-nums .hi { color: var(--text); font-weight: 500; }
 
 /* LOADING */
 .loading {
@@ -379,6 +391,7 @@ td {
   <div class="tabs">
     <button class="tab active" onclick="switchTab('pages_all', this)">Всі сторінки</button>
     <button class="tab" onclick="switchTab('pages_new', this)">Нові сторінки</button>
+    <button class="tab" onclick="switchTab('pages_type_summary', this)">Типи сторінок</button>
     <button class="tab" onclick="switchTab('keywords_all', this)">Ключові слова</button>
     <button class="tab" onclick="switchTab('keywords_top_volume', this)">Топ за об'ємом</button>
   </div>
@@ -421,6 +434,7 @@ const SHEET_ID = '1COlbKcnpKLiqc9mJkfjv_wEOTGvDaDq9gtdbS55m0gM';
 const SHEETS = {
   pages_all:           { title: 'Всі сторінки конкурентів', type: 'pages' },
   pages_new:           { title: 'Нові сторінки', type: 'pages_new' },
+  pages_type_summary:  { title: 'Зведення по типах сторінок', type: 'summary' },
   keywords_all:        { title: 'Всі ключові слова', type: 'keywords' },
   keywords_top_volume: { title: 'Топ ключів за об\'ємом пошуку', type: 'keywords' },
 };
@@ -509,6 +523,37 @@ function renderTable(data, type) {
     return;
   }
 
+  // Summary view
+  if (type === 'summary') {
+    const byComp = {};
+    data.forEach(row => {
+      const c = row.competitor || 'unknown';
+      if (!byComp[c]) byComp[c] = {};
+      const pt = row.page_type || 'other';
+      byComp[c][pt] = {
+        count: parseInt(row.pages_count) || 0,
+        traffic: parseInt(row.total_traffic) || 0
+      };
+    });
+    const typeOrder = ['product','category','subcategory','section','promo','blog','brand_page','main','service','other'];
+    tbody.innerHTML = `<div class="summary-grid">${
+      Object.entries(byComp).map(([comp, types]) => `
+        <div class="summary-card">
+          <div class="summary-comp">${comp}</div>
+          ${typeOrder.filter(t => types[t]).map(t => `
+            <div class="summary-row">
+              <span class="summary-type">${fmtPageType(t)}</span>
+              <div class="summary-nums">
+                <span><span class="hi">${(types[t].count||0).toLocaleString()}</span> стор.</span>
+                <span><span class="hi">${fmtNum(types[t].traffic)}</span> трафік</span>
+              </div>
+            </div>`).join('')}
+        </div>`).join('')
+    }</div>`;
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+
   const start = (currentPage - 1) * PAGE_SIZE;
   const page  = data.slice(start, start + PAGE_SIZE);
 
@@ -593,7 +638,16 @@ function applyFilters() {
   const cat      = document.getElementById('catFilter').value;
   const pageType = document.getElementById('pageTypeFilter').value;
   const search   = document.getElementById('searchInput').value.toLowerCase();
-  const isPages  = SHEETS[currentSheet].type !== 'keywords';
+  const type     = SHEETS[currentSheet].type;
+  const isPages  = type !== 'keywords';
+
+  // Summary — no filtering, show all
+  if (type === 'summary') {
+    filteredData = currentData;
+    document.getElementById('tableCount').textContent = `${currentData.length} рядків`;
+    renderTable(filteredData, type);
+    return;
+  }
 
   filteredData = currentData.filter(row => {
     if (comp     && row.competitor !== comp) return false;
@@ -639,11 +693,15 @@ async function loadSheet(sheet) {
   document.getElementById('tableTitle').textContent = SHEETS[sheet].title;
   document.getElementById('tableCount').textContent = '';
 
-  const isPages = SHEETS[sheet].type !== 'keywords';
-  document.getElementById('catLabel').style.display    = isPages ? 'none' : '';
-  document.getElementById('catFilter').style.display   = isPages ? 'none' : '';
-  document.getElementById('ptLabel').style.display     = isPages ? '' : 'none';
-  document.getElementById('pageTypeFilter').style.display = isPages ? '' : 'none';
+  const isPages   = SHEETS[sheet].type !== 'keywords';
+  const isSummary = SHEETS[sheet].type === 'summary';
+  document.getElementById('catLabel').style.display        = (!isPages) ? '' : 'none';
+  document.getElementById('catFilter').style.display       = (!isPages) ? '' : 'none';
+  document.getElementById('ptLabel').style.display         = (isPages && !isSummary) ? '' : 'none';
+  document.getElementById('pageTypeFilter').style.display  = (isPages && !isSummary) ? '' : 'none';
+  document.getElementById('compFilter').parentElement.style.display = isSummary ? 'none' : '';
+  // show/hide search
+  document.getElementById('searchInput').style.display = isSummary ? 'none' : '';
 
   try {
     currentData = await fetchCSV(sheet);
