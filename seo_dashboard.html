@@ -335,7 +335,41 @@ td {
 .page-btn:disabled { opacity: .3; cursor: not-allowed; }
 .page-info { font-size: 11px; color: var(--muted); }
 
-/* CHARTS */
+/* ROZETKA CATEGORY TREE */
+.roz-filters { display:flex; gap:10px; align-items:center; margin-bottom:20px; flex-wrap:wrap; }
+.roz-search { background:var(--surface); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:'JetBrains Mono',monospace; font-size:11px; padding:7px 14px; outline:none; width:240px; transition:border-color .2s; }
+.roz-search:focus { border-color:var(--accent); }
+.roz-search::placeholder { color:var(--muted); }
+.roz-lvl1-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(380px,1fr)); gap:12px; }
+.roz-lvl1-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; transition:border-color .2s; }
+.roz-lvl1-card:hover { border-color:var(--accent); }
+.roz-lvl1-header { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; cursor:pointer; user-select:none; gap:12px; }
+.roz-lvl1-name { font-family:'Unbounded',sans-serif; font-size:12px; font-weight:600; color:var(--text); flex:1; }
+.roz-lvl1-meta { display:flex; gap:14px; align-items:center; flex-shrink:0; }
+.roz-traffic { font-size:12px; color:var(--accent); font-variant-numeric:tabular-nums; font-weight:700; }
+.roz-count { font-size:10px; color:var(--muted); }
+.roz-arrow { font-size:12px; color:var(--muted); transition:transform .2s; }
+.roz-lvl1-card.open .roz-arrow { transform:rotate(180deg); }
+.roz-bar-wrap { height:3px; background:var(--border); margin:0 18px 0; border-radius:2px; }
+.roz-bar { height:3px; background:var(--accent); border-radius:2px; transition:width .4s; }
+.roz-subcats { display:none; border-top:1px solid var(--border); }
+.roz-lvl1-card.open .roz-subcats { display:block; }
+.roz-subcat-row { display:flex; align-items:center; justify-content:space-between; padding:9px 18px 9px 28px; border-bottom:0.5px solid rgba(42,42,56,.5); transition:background .15s; gap:10px; }
+.roz-subcat-row:last-child { border-bottom:none; }
+.roz-subcat-row:hover { background:var(--surface2); }
+.roz-subcat-name { font-size:11px; color:var(--text); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.roz-subcat-name a { color:var(--accent); text-decoration:none; font-size:10px; margin-left:6px; opacity:0; transition:opacity .15s; }
+.roz-subcat-row:hover .roz-subcat-name a { opacity:1; }
+.roz-subcat-bar { width:80px; height:4px; background:var(--border); border-radius:2px; flex-shrink:0; }
+.roz-subcat-bar-fill { height:4px; background:var(--accent2); border-radius:2px; }
+.roz-subcat-traffic { font-size:11px; color:var(--text); font-variant-numeric:tabular-nums; min-width:48px; text-align:right; flex-shrink:0; }
+.roz-subcat-cnt { font-size:10px; color:var(--muted); min-width:48px; text-align:right; flex-shrink:0; }
+.roz-empty { padding:60px; text-align:center; color:var(--muted); font-size:12px; }
+.roz-stats { display:flex; gap:20px; margin-bottom:20px; }
+.roz-stat { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 20px; }
+.roz-stat-val { font-family:'Unbounded',sans-serif; font-size:22px; font-weight:800; color:var(--accent); }
+.roz-stat-label { font-size:10px; color:var(--muted); margin-top:2px; text-transform:uppercase; letter-spacing:.08em; }
+
 .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; }
 .chart-title { font-size: 11px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 12px; }
 
@@ -347,8 +381,39 @@ td {
 .summary-row:last-child { border-bottom:none; }
 .summary-nums { display:flex; gap:14px; font-size:11px; color:var(--muted); }
 .summary-nums .hi { color:var(--text); font-weight:500; }
-/* EMPTY */
-.empty { padding: 50px; text-align: center; color: var(--muted); font-size: 12px; }
+/* ROZETKA CATEGORIES */
+.rzk-wrap { padding: 20px 0; }
+.rzk-filters { display:flex; gap:10px; align-items:center; margin-bottom:20px; flex-wrap:wrap; }
+.rzk-search { background:var(--surface); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:'JetBrains Mono',monospace; font-size:11px; padding:7px 12px; outline:none; width:260px; transition:border-color .2s; }
+.rzk-search:focus { border-color:var(--accent); }
+.rzk-search::placeholder { color:var(--muted); }
+.rzk-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:14px; }
+.rzk-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; transition:border-color .2s; }
+.rzk-card:hover { border-color:var(--accent); }
+.rzk-card-header { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; cursor:pointer; user-select:none; }
+.rzk-card-header:hover { background:var(--surface2); }
+.rzk-lvl1 { font-family:'Unbounded',sans-serif; font-size:11px; font-weight:600; color:var(--text); flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rzk-traffic { font-size:12px; color:var(--accent); font-variant-numeric:tabular-nums; margin-left:10px; white-space:nowrap; }
+.rzk-arrow { font-size:10px; color:var(--muted); margin-left:8px; transition:transform .2s; }
+.rzk-card.open .rzk-arrow { transform:rotate(180deg); }
+.rzk-bar-wrap { padding:0 16px 6px; }
+.rzk-bar-bg { background:var(--surface2); border-radius:3px; height:4px; margin-bottom:10px; overflow:hidden; }
+.rzk-bar-fill { height:100%; background:var(--accent); border-radius:3px; transition:width .4s; }
+.rzk-subcats { display:none; border-top:1px solid var(--border); }
+.rzk-card.open .rzk-subcats { display:block; }
+.rzk-sub-row { display:flex; align-items:center; justify-content:space-between; padding:9px 16px; border-bottom:0.5px solid rgba(42,42,56,.5); transition:background .15s; }
+.rzk-sub-row:last-child { border-bottom:none; }
+.rzk-sub-row:hover { background:var(--surface2); }
+.rzk-sub-name { font-size:11px; color:var(--text); flex:1; min-width:0; }
+.rzk-sub-name a { color:var(--accent); text-decoration:none; font-size:10px; margin-left:6px; opacity:0; transition:opacity .15s; }
+.rzk-sub-row:hover .rzk-sub-name a { opacity:1; }
+.rzk-sub-traffic { font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; margin-left:10px; }
+.rzk-sub-traffic span { color:var(--text); }
+.rzk-sub-bar { width:80px; height:3px; background:var(--surface2); border-radius:2px; margin-left:10px; overflow:hidden; flex-shrink:0; }
+.rzk-sub-bar-fill { height:100%; background:var(--accent2); border-radius:2px; }
+.rzk-pages { font-size:10px; color:var(--muted); margin-left:8px; white-space:nowrap; }
+.rzk-empty { padding:60px; text-align:center; color:var(--muted); font-size:12px; }
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 </head>
@@ -395,6 +460,7 @@ td {
     <button class="tab" onclick="switchTab('pages_type_summary', this)">Типи сторінок</button>
     <button class="tab" onclick="switchTab('keywords_all', this)">Ключові слова</button>
     <button class="tab" onclick="switchTab('keywords_top_volume', this)">Топ за об'ємом</button>
+    <button class="tab" onclick="showRozetka(this)">Категорії Rozetka</button>
     <button class="tab" onclick="showCharts(this)">Графіки</button>
   </div>
 
@@ -424,6 +490,7 @@ td {
   </div>
 
   <div id="chartsPanel" style="display:none"></div>
+  <div id="rozetkaPanel" style="display:none"></div>
 
   <div id="tableWrap" class="table-wrap">
     <div class="table-header">
@@ -722,9 +789,10 @@ async function loadSheet(sheet) {
 async function switchTab(sheet, btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
-  document.getElementById('chartsPanel').style.display = 'none';
-  document.getElementById('tableWrap').style.display   = '';
-  document.getElementById('filtersBar').style.display  = '';
+  document.getElementById('chartsPanel').style.display  = 'none';
+  document.getElementById('rozetkaPanel').style.display = 'none';
+  document.getElementById('tableWrap').style.display    = '';
+  document.getElementById('filtersBar').style.display   = '';
   currentSheet = sheet;
   sortCol = null;
   currentPage = 1;
@@ -743,12 +811,140 @@ function urlToName(url) {
   } catch { return url.slice(0,35); }
 }
 
+async function showRozetka(btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('chartsPanel').style.display  = 'none';
+  document.getElementById('tableWrap').style.display    = 'none';
+  document.getElementById('filtersBar').style.display   = 'none';
+  const panel = document.getElementById('rozetkaPanel');
+  panel.style.display = 'block';
+
+  if (window._rozetkaBuilt) return;
+  window._rozetkaBuilt = true;
+  panel.innerHTML = '<div class="loading"><div class="spinner"></div> Завантажуємо категорії Rozetka...</div>';
+
+  try {
+    const data = await fetchCSV('rozetka_categories');
+    if (!data.length) {
+      panel.innerHTML = '<div class="roz-empty">Дані відсутні — спочатку запусти скрипт</div>';
+      return;
+    }
+    buildRozetkaTree(data, panel);
+  } catch(e) {
+    panel.innerHTML = `<div class="error-msg">Помилка: ${e.message}</div>`;
+  }
+}
+
+function buildRozetkaTree(data, panel) {
+  const tFmt = v => { const n=parseInt(v)||0; return n>=1000000?(n/1000000).toFixed(1)+'M':n>=1000?(n/1000).toFixed(0)+'K':n.toLocaleString(); };
+
+  // Group by lvl1 → lvl2
+  const lvl1Map = {};
+  data.forEach(r => {
+    const l1   = (r.cat_lvl1||'').trim() || 'Інше';
+    const l2   = (r.cat_lvl2||'').trim() || (r.cat_name||'').trim();
+    const traf = parseInt(r.total_traffic)||0;
+    const cnt  = parseInt(r.pages_count)||0;
+    if (!lvl1Map[l1]) lvl1Map[l1] = { traffic:0, pages:0, subs:{} };
+    lvl1Map[l1].traffic += traf;
+    lvl1Map[l1].pages   += cnt;
+    if (!lvl1Map[l1].subs[l2]) lvl1Map[l1].subs[l2] = { traffic:0, pages:0, rows:[] };
+    lvl1Map[l1].subs[l2].traffic += traf;
+    lvl1Map[l1].subs[l2].pages   += cnt;
+    lvl1Map[l1].subs[l2].rows.push(r);
+  });
+
+  const lvl1Sorted = Object.entries(lvl1Map)
+    .sort((a,b) => b[1].traffic - a[1].traffic)
+    .slice(0, 15);
+
+  const maxTraf      = lvl1Sorted[0]?.[1]?.traffic || 1;
+  const totalTraffic = lvl1Sorted.reduce((s,[,v])=>s+v.traffic,0);
+  const totalPages   = lvl1Sorted.reduce((s,[,v])=>s+v.pages,0);
+
+  panel.innerHTML = `
+    <div class="roz-stats">
+      <div class="roz-stat"><div class="roz-stat-val">${lvl1Sorted.length}</div><div class="roz-stat-label">Категорій lvl1</div></div>
+      <div class="roz-stat"><div class="roz-stat-val">${tFmt(totalTraffic)}</div><div class="roz-stat-label">Сумарний трафік</div></div>
+      <div class="roz-stat"><div class="roz-stat-val">${totalPages.toLocaleString()}</div><div class="roz-stat-label">Сторінок</div></div>
+    </div>
+    <div class="roz-filters">
+      <span class="filter-label">Пошук:</span>
+      <input class="roz-search" id="rozSearch" placeholder="Назва категорії..." oninput="rozFilter(this.value)">
+      <span id="rozCount" style="margin-left:auto;color:var(--muted);font-size:11px">${lvl1Sorted.length} категорій</span>
+    </div>
+    <div class="roz-lvl1-grid" id="rozGrid">
+      ${lvl1Sorted.map(([l1name, l1data], idx) => {
+        const pct = Math.round(l1data.traffic*100/maxTraf);
+        const subsorted = Object.entries(l1data.subs)
+          .sort((a,b)=>b[1].traffic-a[1].traffic).slice(0,15);
+        const maxSubTraf = subsorted[0]?.[1]?.traffic||1;
+
+        const subRows = subsorted.map(([l2name, l2data]) => {
+          const sp = Math.round(l2data.traffic*100/maxSubTraf);
+          const bestRow = l2data.rows.sort((a,b)=>(parseInt(b.total_traffic)||0)-(parseInt(a.total_traffic)||0))[0];
+          const href = bestRow?.cat_url || `https://rozetka.com.ua/ua/search/?text=${encodeURIComponent(l2name)}`;
+          return `<div class="roz-subcat-row" data-name="${l2name.toLowerCase()}">
+            <span class="roz-subcat-name">${l2name}<a href="${href}" target="_blank" title="Відкрити на Rozetka">↗</a></span>
+            <div class="roz-subcat-bar"><div class="roz-subcat-bar-fill" style="width:${sp}%"></div></div>
+            <span class="roz-subcat-traffic">${tFmt(l2data.traffic)}</span>
+            <span class="roz-subcat-cnt">${l2data.pages} стор.</span>
+          </div>`;
+        }).join('');
+
+        return `<div class="roz-lvl1-card" id="rozCard${idx}" data-name="${l1name.toLowerCase()}">
+          <div class="roz-lvl1-header" onclick="rozToggle(${idx})">
+            <span class="roz-lvl1-name">${l1name}</span>
+            <div class="roz-lvl1-meta">
+              <span class="roz-traffic">${tFmt(l1data.traffic)}</span>
+              <span class="roz-count">${l1data.pages} стор.</span>
+              <span class="roz-arrow">▼</span>
+            </div>
+          </div>
+          <div class="roz-bar-wrap"><div class="roz-bar" style="width:${pct}%"></div></div>
+          <div class="roz-subcats" id="rozSubs${idx}">
+            <div style="display:flex;justify-content:space-between;padding:8px 18px 6px 28px;font-size:10px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid var(--border)">
+              <span>Підкатегорія</span>
+              <span style="display:flex;gap:40px"><span>Трафік</span><span>Стор.</span></span>
+            </div>
+            ${subRows||'<div style="padding:16px 28px;font-size:11px;color:var(--muted)">Підкатегорій немає</div>'}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+window.rozToggle = idx => {
+  document.getElementById(`rozCard${idx}`).classList.toggle('open');
+};
+
+window.rozFilter = q => {
+  const query = q.toLowerCase().trim();
+  let vis = 0;
+  document.querySelectorAll('.roz-lvl1-card').forEach(card => {
+    const nameMatch = !query || card.dataset.name.includes(query);
+    let subVis = 0;
+    card.querySelectorAll('.roz-subcat-row').forEach(row => {
+      const show = !query || row.dataset.name.includes(query);
+      row.style.display = show ? '' : 'none';
+      if (show) subVis++;
+    });
+    const show = nameMatch || subVis > 0;
+    card.style.display = show ? '' : 'none';
+    if (show) { vis++; if (query && subVis > 0) card.classList.add('open'); }
+  });
+  const el = document.getElementById('rozCount');
+  if (el) el.textContent = `${vis} категорій`;
+};
+
 async function showCharts(btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
-  document.getElementById('chartsPanel').style.display = 'block';
-  document.getElementById('tableWrap').style.display   = 'none';
-  document.getElementById('filtersBar').style.display  = 'none';
+  document.getElementById('chartsPanel').style.display  = 'block';
+  document.getElementById('rozetkaPanel').style.display = 'none';
+  document.getElementById('tableWrap').style.display    = 'none';
+  document.getElementById('filtersBar').style.display   = 'none';
   if (window._chartsBuilt) return;
   window._chartsBuilt = true;
   document.getElementById('chartsPanel').innerHTML =
@@ -987,6 +1183,145 @@ function buildCharts(pages, keywords) {
                y:{ticks:{color:'#6b6b88',font:{size:10},callback:tFmt},grid:{color:'rgba(42,42,56,.5)'}}}}
   });
 }
+
+// ── ROZETKA CATEGORIES ────────────────────────────────────────────────────────
+let _rzkData = null;
+
+async function showRozetkaCategories(btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('chartsPanel').style.display  = 'none';
+  document.getElementById('tableWrap').style.display    = 'none';
+  document.getElementById('filtersBar').style.display   = 'none';
+  document.getElementById('rozetkaPanel').style.display = 'block';
+
+  if (_rzkData) { renderRozetka(_rzkData); return; }
+
+  document.getElementById('rozetkaPanel').innerHTML =
+    '<div class="loading"><div class="spinner"></div> Завантажуємо категорії Rozetka...</div>';
+
+  try {
+    _rzkData = await fetchCSV('rozetka_categories');
+    renderRozetka(_rzkData);
+  } catch(e) {
+    document.getElementById('rozetkaPanel').innerHTML =
+      `<div class="error-msg">⚠ Не вдалося завантажити rozetka_categories<br><small>${e.message}</small></div>`;
+  }
+}
+
+function fmtNum2(v) {
+  const n = parseInt(v)||0;
+  if (n>=1000000) return (n/1000000).toFixed(1)+'M';
+  if (n>=1000)    return (n/1000).toFixed(0)+'K';
+  return n.toLocaleString();
+}
+
+function buildRzkUrl(catId) {
+  // Намагаємось скласти URL Rozetka з cat_id
+  return catId ? `https://rozetka.com.ua/ua/c${catId}/` : null;
+}
+
+function renderRozetka(data, searchQ='') {
+  const panel = document.getElementById('rozetkaPanel');
+  const q = searchQ.toLowerCase().trim();
+
+  // Group by lvl1
+  const byLvl1 = {};
+  data.forEach(row => {
+    const lvl1 = (row.cat_lvl1||'').trim();
+    const lvl2 = (row.cat_lvl2||'').trim();
+    const name = (row.cat_name||'').trim();
+    if (!lvl1) return;
+
+    // Search filter
+    if (q && !lvl1.toLowerCase().includes(q) && !lvl2.toLowerCase().includes(q) && !name.toLowerCase().includes(q)) return;
+
+    if (!byLvl1[lvl1]) byLvl1[lvl1] = { traffic:0, pages:0, subs:{} };
+    const t = parseInt(row.total_traffic)||0;
+    const p = parseInt(row.pages_count)||0;
+    byLvl1[lvl1].traffic += t;
+    byLvl1[lvl1].pages   += p;
+
+    // Group subcategories by lvl2, then name
+    const subKey = lvl2 || name;
+    if (!byLvl1[lvl1].subs[subKey]) byLvl1[lvl1].subs[subKey] = { traffic:0, pages:0, cat_id: row.cat_id||'' };
+    byLvl1[lvl1].subs[subKey].traffic += t;
+    byLvl1[lvl1].subs[subKey].pages   += p;
+    if (!byLvl1[lvl1].subs[subKey].cat_id) byLvl1[lvl1].subs[subKey].cat_id = row.cat_id||'';
+  });
+
+  // Sort lvl1 by traffic, top 15
+  const lvl1List = Object.entries(byLvl1)
+    .sort((a,b) => b[1].traffic - a[1].traffic)
+    .slice(0, 15);
+
+  if (!lvl1List.length) {
+    panel.innerHTML = `
+      <div class="rzk-wrap">
+        <div class="rzk-filters">
+          <input class="rzk-search" placeholder="Пошук категорії..." oninput="renderRozetka(_rzkData, this.value)" value="${searchQ}">
+        </div>
+        <div class="rzk-empty">Нічого не знайдено</div>
+      </div>`;
+    return;
+  }
+
+  const maxTraffic = lvl1List[0][1].traffic;
+
+  const cards = lvl1List.map(([lvl1, info]) => {
+    const barPct = maxTraffic > 0 ? (info.traffic / maxTraffic * 100).toFixed(1) : 0;
+
+    // Top 15 subcategories
+    const subList = Object.entries(info.subs)
+      .sort((a,b) => b[1].traffic - a[1].traffic)
+      .slice(0, 15);
+    const maxSubT = subList.length ? subList[0][1].traffic : 1;
+
+    const subRows = subList.map(([subName, subInfo]) => {
+      const subBarPct = (subInfo.traffic / maxSubT * 100).toFixed(1);
+      const href = buildRzkUrl(subInfo.cat_id);
+      return `<div class="rzk-sub-row">
+        <div class="rzk-sub-name">
+          ${subName}
+          ${href ? `<a href="${href}" target="_blank" title="Відкрити на Rozetka">↗</a>` : ''}
+        </div>
+        <div class="rzk-sub-bar"><div class="rzk-sub-bar-fill" style="width:${subBarPct}%"></div></div>
+        <div class="rzk-sub-traffic"><span>${fmtNum2(subInfo.traffic)}</span></div>
+        <div class="rzk-pages">${subInfo.pages} стор.</div>
+      </div>`;
+    }).join('');
+
+    const cardId = 'rzk_' + lvl1.replace(/\s+/g,'_').replace(/[^a-zA-Zа-яА-ЯіїєёА-ЯЁ0-9_]/g,'');
+    return `
+      <div class="rzk-card" id="${cardId}">
+        <div class="rzk-card-header" onclick="toggleRzk('${cardId}')">
+          <div class="rzk-lvl1">${lvl1}</div>
+          <div class="rzk-traffic">${fmtNum2(info.traffic)}</div>
+          <div class="rzk-pages" style="margin-left:8px">${info.pages} стор.</div>
+          <div class="rzk-arrow">▼</div>
+        </div>
+        <div class="rzk-bar-wrap">
+          <div class="rzk-bar-bg"><div class="rzk-bar-fill" style="width:${barPct}%"></div></div>
+        </div>
+        <div class="rzk-subcats">${subRows}</div>
+      </div>`;
+  }).join('');
+
+  panel.innerHTML = `
+    <div class="rzk-wrap">
+      <div class="rzk-filters">
+        <span class="filter-label">Топ-${lvl1List.length} категорій першого рівня по трафіку</span>
+        <input class="rzk-search" placeholder="Пошук категорії..." oninput="renderRozetka(_rzkData, this.value)" value="${searchQ}" style="margin-left:auto">
+      </div>
+      <div class="rzk-grid">${cards}</div>
+    </div>`;
+}
+
+function toggleRzk(cardId) {
+  document.getElementById(cardId).classList.toggle('open');
+}
+
+// ── END ROZETKA ────────────────────────────────────────────────────────────────
 
 async function init() {
   await loadSheet('pages_all');
