@@ -354,12 +354,11 @@ td {
 .roz-bar { height:3px; background:var(--accent); border-radius:2px; transition:width .4s; }
 .roz-subcats { display:none; border-top:1px solid var(--border); }
 .roz-lvl1-card.open .roz-subcats { display:block; }
-.roz-subcat-row { display:flex; align-items:center; justify-content:space-between; padding:9px 18px 9px 28px; border-bottom:0.5px solid rgba(42,42,56,.5); transition:background .15s; gap:10px; }
+.roz-subcat-row { display:flex; align-items:flex-start; justify-content:space-between; padding:9px 18px 9px 28px; border-bottom:0.5px solid rgba(42,42,56,.5); transition:background .15s; gap:12px; }
 .roz-subcat-row:last-child { border-bottom:none; }
 .roz-subcat-row:hover { background:var(--surface2); }
-.roz-subcat-name { font-size:11px; color:var(--text); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.roz-subcat-name a { color:var(--accent); text-decoration:none; font-size:10px; margin-left:6px; opacity:0; transition:opacity .15s; }
-.roz-subcat-row:hover .roz-subcat-name a { opacity:1; }
+.roz-subcat-name { font-size:11px; color:var(--text); flex:1; min-width:0; word-break:break-word; line-height:1.4; }
+.roz-subcat-name a { color:var(--accent); text-decoration:none; font-size:10px; margin-left:6px; }
 .roz-subcat-bar { width:80px; height:4px; background:var(--border); border-radius:2px; flex-shrink:0; }
 .roz-subcat-bar-fill { height:4px; background:var(--accent2); border-radius:2px; }
 .roz-subcat-traffic { font-size:11px; color:var(--text); font-variant-numeric:tabular-nums; min-width:48px; text-align:right; flex-shrink:0; }
@@ -854,33 +853,34 @@ function buildRozetkaTree(data, panel) {
     const cnt  = parseInt(r.pages_count)||0;
     const url  = (r.cat_url||'').trim();
 
-    if (!lvl1Map[l1]) lvl1Map[l1] = { traffic:0, pages:0, url:'', subs:{} };
+    if (!lvl1Map[l1]) lvl1Map[l1] = { traffic:0, pages:0, url:'', _rootTraf:0, subs:{} };
     lvl1Map[l1].traffic += traf;
     lvl1Map[l1].pages   += cnt;
-    // Best URL for lvl1 = highest traffic row where l2 is empty (root category)
-    if (!l2 && url && traf > (lvl1Map[l1]._rootTraf||0)) {
+    // lvl1 URL = row where l2 is empty (root level)
+    if (!l2 && url && traf > lvl1Map[l1]._rootTraf) {
       lvl1Map[l1].url = url;
       lvl1Map[l1]._rootTraf = traf;
     }
 
-    const l2key = l2 || l3; // if no l2, use l3 as the group
-    if (!lvl1Map[l1].subs[l2key]) lvl1Map[l1].subs[l2key] = { traffic:0, pages:0, url:'', items:{} };
+    const l2key = l2 || l3;
+    if (!lvl1Map[l1].subs[l2key]) lvl1Map[l1].subs[l2key] = { traffic:0, pages:0, url:'', _bestTraf:0, items:{} };
     lvl1Map[l1].subs[l2key].traffic += traf;
     lvl1Map[l1].subs[l2key].pages   += cnt;
-    // Best URL for lvl2 = highest traffic row in this group
-    if (!lvl1Map[l1].subs[l2key].url || traf > (lvl1Map[l1].subs[l2key]._bestTraf||0)) {
+    // lvl2 URL = best traffic URL in this group (use actual row URL)
+    if (url && traf > lvl1Map[l1].subs[l2key]._bestTraf) {
       lvl1Map[l1].subs[l2key].url = url;
       lvl1Map[l1].subs[l2key]._bestTraf = traf;
     }
 
-    // lvl3: only add if l3 differs from l2key (avoid duplicates)
+    // lvl3: cat_name as leaf, only when differs from l2key
     if (l3 && l3 !== l2key) {
       if (!lvl1Map[l1].subs[l2key].items[l3]) {
-        lvl1Map[l1].subs[l2key].items[l3] = { traffic:0, pages:0, url:'' };
+        lvl1Map[l1].subs[l2key].items[l3] = { traffic:0, pages:0, url:'', _bestTraf:0 };
       }
       lvl1Map[l1].subs[l2key].items[l3].traffic += traf;
       lvl1Map[l1].subs[l2key].items[l3].pages   += cnt;
-      if (url && traf > (lvl1Map[l1].subs[l2key].items[l3]._bestTraf||0)) {
+      // lvl3 URL = actual URL of this specific category
+      if (url && traf > lvl1Map[l1].subs[l2key].items[l3]._bestTraf) {
         lvl1Map[l1].subs[l2key].items[l3].url = url;
         lvl1Map[l1].subs[l2key].items[l3]._bestTraf = traf;
       }
@@ -946,14 +946,14 @@ function buildRozetkaTree(data, panel) {
           const l3Id = `rozL3_${idx}_${si}`;
           return `<div class="roz-subcat-row" data-name="${l2name.toLowerCase()}">
             <div style="flex:1;min-width:0">
-              <div style="display:flex;align-items:center;gap:6px">
-                ${hasL3 ? `<span class="roz-sub-arr" onclick="rozToggleL3('${l3Id}',this)" style="cursor:pointer;font-size:9px;color:var(--muted);flex-shrink:0;user-select:none">▸</span>` : '<span style="width:12px;flex-shrink:0"></span>'}
-                <span class="roz-subcat-name" style="white-space:normal">${l2name}</span>
-                ${l2link}
+              <div style="display:flex;align-items:flex-start;gap:4px">
+                ${hasL3 ? `<span class="roz-sub-arr" onclick="rozToggleL3('${l3Id}',this)" style="cursor:pointer;font-size:9px;color:var(--muted);flex-shrink:0;user-select:none;margin-top:2px">▸</span>` : '<span style="width:12px;flex-shrink:0"></span>'}
+                <span class="roz-subcat-name">${l2name}</span>
+                ${l2url ? `<a href="${l2url}" target="_blank" onclick="event.stopPropagation()" style="color:var(--accent);font-size:10px;text-decoration:none;flex-shrink:0;opacity:.8;margin-top:1px" title="Відкрити">↗</a>` : ''}
               </div>
-              ${hasL3 ? `<div id="${l3Id}" style="display:none;margin-top:6px;margin-left:16px">${l3Html}</div>` : ''}
+              ${hasL3 ? `<div id="${l3Id}" style="display:none;margin-top:8px;margin-left:16px;padding-bottom:4px">${l3Html}</div>` : ''}
             </div>
-            <div style="display:flex;gap:10px;align-items:center;flex-shrink:0;margin-left:8px">
+            <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;margin-left:8px;margin-top:2px">
               <div class="roz-subcat-bar"><div class="roz-subcat-bar-fill" style="width:${sp}%"></div></div>
               <span class="roz-subcat-traffic">${tFmt(l2data.traffic)}</span>
               <span class="roz-subcat-cnt">${l2data.pages} стор.</span>
