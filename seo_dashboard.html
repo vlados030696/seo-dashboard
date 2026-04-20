@@ -851,7 +851,9 @@ function buildRozetkaTree(data, panel) {
     const l3   = (r.cat_name||'').trim();
     const traf = parseInt(r.total_traffic)||0;
     const cnt  = parseInt(r.pages_count)||0;
-    const url  = (r.cat_url||'').trim();
+    const catId = (r.cat_id||'').trim();
+    // Use cat_url if present, otherwise build from cat_id
+    const url = (r.cat_url||'').trim() || (catId ? `https://rozetka.com.ua/ua/c${catId}/` : '');
 
     if (!lvl1Map[l1]) lvl1Map[l1] = { traffic:0, pages:0, url:'', _rootTraf:0, subs:{} };
     lvl1Map[l1].traffic += traf;
