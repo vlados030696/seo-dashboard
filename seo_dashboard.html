@@ -365,7 +365,7 @@ td {
 .roz-subcat-cnt { font-size:10px; color:var(--muted); min-width:48px; text-align:right; flex-shrink:0; }
 .roz-lvl3-row { display:flex; align-items:center; gap:8px; padding:4px 0; border-bottom:0.5px solid rgba(42,42,56,.3); }
 .roz-lvl3-row:last-child { border-bottom:none; }
-.roz-lvl3-name { font-size:10px; color:var(--muted); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.roz-lvl3-name { font-size:10px; color:var(--muted); flex:1; min-width:0; word-break:break-word; line-height:1.4; }
 .roz-lvl3-name a { color:var(--new); }
 .roz-sub-arr { display:inline-block; width:12px; text-align:center; }
 .roz-empty { padding:60px; text-align:center; color:var(--muted); font-size:12px; }
@@ -842,44 +842,76 @@ async function showRozetka(btn) {
 
 function buildRozetkaTree(data, panel) {
   const tFmt = v => { const n=parseInt(v)||0; return n>=1000000?(n/1000000).toFixed(1)+'M':n>=1000?(n/1000).toFixed(0)+'K':n.toLocaleString(); };
-  const isFiltered = u => u && (u.includes('preset=') || u.includes('producer=') || u.includes('brand='));
-  const fBadge = `<span style="font-size:8px;background:rgba(253,161,16,.2);color:#fda110;border:1px solid rgba(253,161,16,.4);border-radius:3px;padding:0 4px;margin-left:5px;vertical-align:middle;flex-shrink:0">filter</span>`;
+  const hasFilt = u => u && (u.includes('preset=') || u.includes('producer=') || u.includes('brand='));
+  const fBadge  = '<span style="font-size:8px;background:rgba(253,161,16,.2);color:#fda110;border:1px solid rgba(253,161,16,.4);border-radius:3px;padding:0 4px;margin-left:5px">filter</span>';
+
+  // ── Group data: lvl1 → lvl2 → lvl3 ──────────────────────────────────────
+  // KEY INSIGHT:
+  // Each row has: cat_lvl1, cat_lvl2, cat_name, cat_url
+  // cat_name is the LEAF (deepest) category of this row
+  // cat_lvl2 is the parent grouping key
+  // If cat_lvl2 is empty, cat_name IS the lvl2
+  // A row's URL belongs to cat_name, not to cat_lvl2 (unless cat_name === cat_lvl2)
 
   const lvl1Map = {};
   data.forEach(r => {
-    const l1   = (r.cat_lvl1||'').trim() || 'Інше';
-    const l2   = (r.cat_lvl2||'').trim() || '';
-    const l3   = (r.cat_name||'').trim();
-    const traf = parseInt(r.total_traffic)||0;
-    const cnt  = parseInt(r.pages_count)||0;
-    const url  = (r.cat_url||'').trim();
-    const l2key = l2 || l3;
+    const l1  = (r.cat_lvl1||'').trim() || 'Інше';
+    const l2  = (r.cat_lvl2||'').trim();
+    const l3  = (r.cat_name||'').trim();
+    const traf= parseInt(r.total_traffic)||0;
+    const cnt = parseInt(r.pages_count)||0;
+    const url = (r.cat_url||'').trim();
+    const cid = (r.cat_id||'').trim();
+    // Always have a real rozetka URL (from data or built from cat_id)
+    const realUrl = url || (cid ? 'https://rozetka.com.ua/ua/c'+cid+'/' : '');
 
     if (!lvl1Map[l1]) lvl1Map[l1] = { traffic:0, pages:0, url:'', subs:{} };
     lvl1Map[l1].traffic += traf;
     lvl1Map[l1].pages   += cnt;
-    // lvl1 URL: row where cat_name matches lvl1 name exactly
-    if (!l2 && l3 === l1 && url) lvl1Map[l1].url = url;
+    // lvl1 URL: row where there is no lvl2 and cat_name is the lvl1 itself
+    if (!l2 && realUrl && !lvl1Map[l1].url) lvl1Map[l1].url = realUrl;
 
+    // l2key: the lvl2 group name. If no lvl2, the cat_name IS the group
+    const l2key = l2 || l3;
     if (!lvl1Map[l1].subs[l2key]) lvl1Map[l1].subs[l2key] = { traffic:0, pages:0, url:'', items:{} };
     lvl1Map[l1].subs[l2key].traffic += traf;
     lvl1Map[l1].subs[l2key].pages   += cnt;
-    // lvl2 URL: only when cat_name exactly matches l2key (the category itself)
-    if (l3 === l2key && url) lvl1Map[l1].subs[l2key].url = url;
 
-    // lvl3: rows where cat_name differs from l2key
-    if (l3 && l3 !== l2key) {
-      if (!lvl1Map[l1].subs[l2key].items[l3]) lvl1Map[l1].subs[l2key].items[l3] = { traffic:0, pages:0, url:'' };
+    if (l2) {
+      // Has lvl2: this row's cat_name is a lvl3 item UNDER l2key
+      // The lvl2 group URL: look for a row where cat_name === cat_lvl2
+      // We can't determine it here directly, so we'll set it separately below
+      if (!lvl1Map[l1].subs[l2key].items[l3]) {
+        lvl1Map[l1].subs[l2key].items[l3] = { traffic:0, pages:0, url:'' };
+      }
       lvl1Map[l1].subs[l2key].items[l3].traffic += traf;
       lvl1Map[l1].subs[l2key].items[l3].pages   += cnt;
-      if (url) lvl1Map[l1].subs[l2key].items[l3].url = url;
+      if (realUrl && !lvl1Map[l1].subs[l2key].items[l3].url) {
+        lvl1Map[l1].subs[l2key].items[l3].url = realUrl;
+      }
+    } else {
+      // No lvl2: this row IS the lvl2 group itself
+      // Its URL is its own realUrl
+      if (realUrl && !lvl1Map[l1].subs[l2key].url) {
+        lvl1Map[l1].subs[l2key].url = realUrl;
+      }
     }
+  });
+
+  // Second pass: for groups that have lvl2, find the group URL
+  // by looking for a lvl3 item whose name === l2key (the category page itself)
+  Object.values(lvl1Map).forEach(l1d => {
+    Object.entries(l1d.subs).forEach(([l2key, l2d]) => {
+      if (!l2d.url && l2d.items[l2key]) {
+        l2d.url = l2d.items[l2key].url || '';
+      }
+    });
   });
 
   const lvl1Sorted   = Object.entries(lvl1Map).sort((a,b)=>b[1].traffic-a[1].traffic).slice(0,15);
   const maxTraf      = lvl1Sorted[0]?.[1]?.traffic || 1;
-  const totalTraffic = lvl1Sorted.reduce((s,[,v])=>s+v.traffic,0);
-  const totalPages   = lvl1Sorted.reduce((s,[,v])=>s+v.pages,0);
+  const totalTraffic = lvl1Sorted.reduce((s,[,v])=>s+v.traffic, 0);
+  const totalPages   = lvl1Sorted.reduce((s,[,v])=>s+v.pages,   0);
 
   panel.innerHTML = `
     <div class="roz-stats">
@@ -893,29 +925,40 @@ function buildRozetkaTree(data, panel) {
       <span id="rozCount" style="margin-left:auto;color:var(--muted);font-size:11px">${lvl1Sorted.length} категорій</span>
     </div>
     <div class="roz-lvl1-grid" id="rozGrid">
-      ${lvl1Sorted.map(([l1name, l1data], idx) => {
-        const pct   = Math.round(l1data.traffic*100/maxTraf);
-        const l1url = l1data.url || '';
-        const l1link = l1url ? `<a href="${l1url}" target="_blank" onclick="event.stopPropagation()" style="font-size:10px;color:var(--bg);background:var(--accent);text-decoration:none;padding:2px 7px;border-radius:4px;flex-shrink:0;font-weight:600;margin-left:6px" title="Відкрити">↗</a>` : '';
-        const subsorted  = Object.entries(l1data.subs).sort((a,b)=>b[1].traffic-a[1].traffic).slice(0,15);
-        const maxSubTraf = subsorted[0]?.[1]?.traffic||1;
+      ${lvl1Sorted.map(([l1name, l1d], idx) => {
+        const pct   = Math.round(l1d.traffic*100/maxTraf);
+        const l1url = l1d.url || '';
+        const l1Btn = l1url
+          ? `<a href="${l1url}" target="_blank" onclick="event.stopPropagation()" style="font-size:10px;color:#000;background:var(--accent);text-decoration:none;padding:2px 8px;border-radius:4px;flex-shrink:0;font-weight:700;margin-left:6px">↗</a>`
+          : '';
 
-        const subRows = subsorted.map(([l2name, l2data], si) => {
-          const sp    = Math.round(l2data.traffic*100/maxSubTraf);
-          const l2url = l2data.url || '';
-          const l2link = l2url ? `<a href="${l2url}" target="_blank" onclick="event.stopPropagation()" style="color:var(--bg);background:var(--accent2);font-size:9px;text-decoration:none;padding:1px 6px;border-radius:3px;flex-shrink:0;font-weight:600" title="Відкрити">↗</a>` : '';
-          const l3entries = Object.entries(l2data.items||{}).sort((a,b)=>b[1].traffic-a[1].traffic).slice(0,12);
-          const maxL3     = l3entries[0]?.[1]?.traffic||1;
-          const hasL3     = l3entries.length > 0;
+        const subs       = Object.entries(l1d.subs).sort((a,b)=>b[1].traffic-a[1].traffic).slice(0,15);
+        const maxSubTraf = subs[0]?.[1]?.traffic || 1;
 
-          const l3Html = l3entries.map(([l3name, l3data]) => {
-            const p3    = Math.round(l3data.traffic*100/maxL3);
-            const l3url = l3data.url || '';
+        const subRows = subs.map(([l2name, l2d], si) => {
+          const sp    = Math.round(l2d.traffic * 100 / maxSubTraf);
+          const l2url = l2d.url || '';
+          const l2Btn = l2url
+            ? `<a href="${l2url}" target="_blank" onclick="event.stopPropagation()" style="color:#000;background:var(--accent2);font-size:9px;text-decoration:none;padding:1px 6px;border-radius:3px;flex-shrink:0;font-weight:700">↗</a>`
+            : '';
+
+          const l3list = Object.entries(l2d.items||{}).sort((a,b)=>b[1].traffic-a[1].traffic).slice(0,12);
+          const maxL3  = l3list[0]?.[1]?.traffic || 1;
+          const hasL3  = l3list.length > 0;
+
+          const l3Html = l3list.map(([l3name, l3d]) => {
+            const p3    = Math.round(l3d.traffic * 100 / maxL3);
+            const l3url = l3d.url || '';
+            const l3Btn = l3url
+              ? `<a href="${l3url}" target="_blank" style="color:var(--new);font-size:9px;text-decoration:none;margin-left:5px;flex-shrink:0">↗</a>`
+              : '';
             return `<div class="roz-lvl3-row" data-name="${l3name.toLowerCase()}">
-              <div class="roz-lvl3-name">${l3name}${isFiltered(l3url)?fBadge:''}${l3url?` <a href="${l3url}" target="_blank" style="color:var(--new);font-size:9px;text-decoration:none;margin-left:4px">↗</a>`:''}</div>
-              <div style="display:flex;gap:5px;align-items:center;flex-shrink:0;margin-top:2px">
-                <div style="width:40px;height:3px;background:var(--border);border-radius:2px"><div style="width:${p3}%;height:3px;background:var(--new);border-radius:2px"></div></div>
-                <span style="font-size:10px;color:var(--muted);min-width:32px;text-align:right">${tFmt(l3data.traffic)}</span>
+              <div class="roz-lvl3-name">${l3name}${hasFilt(l3url)?fBadge:''}${l3Btn}</div>
+              <div style="display:flex;gap:5px;align-items:center;flex-shrink:0;padding-top:2px">
+                <div style="width:40px;height:3px;background:var(--border);border-radius:2px;flex-shrink:0">
+                  <div style="width:${p3}%;height:3px;background:var(--new);border-radius:2px"></div>
+                </div>
+                <span style="font-size:10px;color:var(--muted);min-width:36px;text-align:right;flex-shrink:0">${tFmt(l3d.traffic)}</span>
               </div>
             </div>`;
           }).join('');
@@ -924,31 +967,33 @@ function buildRozetkaTree(data, panel) {
           return `<div class="roz-subcat-row" data-name="${l2name.toLowerCase()}">
             <div style="flex:1;min-width:0">
               <div style="display:flex;align-items:flex-start;gap:4px;flex-wrap:wrap">
-                ${hasL3?`<span class="roz-sub-arr" onclick="rozToggleL3('${l3Id}',this)" style="cursor:pointer;font-size:9px;color:var(--muted);flex-shrink:0;user-select:none;margin-top:3px">▸</span>`:'<span style="width:12px;flex-shrink:0"></span>'}
+                ${hasL3
+                  ? `<span onclick="rozToggleL3('${l3Id}',this)" style="cursor:pointer;font-size:9px;color:var(--muted);flex-shrink:0;user-select:none;padding-top:3px">▸</span>`
+                  : '<span style="width:12px;flex-shrink:0"></span>'}
                 <span class="roz-subcat-name">${l2name}</span>
-                ${isFiltered(l2url)?fBadge:''}
-                ${l2link}
+                ${hasFilt(l2url) ? fBadge : ''}
+                ${l2Btn}
               </div>
-              ${hasL3?`<div id="${l3Id}" style="display:none;margin-top:8px;margin-left:16px;padding-bottom:4px">${l3Html}</div>`:''}
+              ${hasL3 ? `<div id="${l3Id}" style="display:none;margin-top:8px;margin-left:14px">${l3Html}</div>` : ''}
             </div>
-            <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;margin-left:8px;margin-top:3px">
+            <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;margin-left:8px;padding-top:3px">
               <div class="roz-subcat-bar"><div class="roz-subcat-bar-fill" style="width:${sp}%"></div></div>
-              <span class="roz-subcat-traffic">${tFmt(l2data.traffic)}</span>
-              <span class="roz-subcat-cnt">${l2data.pages} стор.</span>
+              <span class="roz-subcat-traffic">${tFmt(l2d.traffic)}</span>
+              <span class="roz-subcat-cnt">${l2d.pages} стор.</span>
             </div>
           </div>`;
         }).join('');
 
         return `<div class="roz-lvl1-card" id="rozCard${idx}" data-name="${l1name.toLowerCase()}">
           <div class="roz-lvl1-header" onclick="rozToggle(${idx})">
-            <div style="display:flex;align-items:center;flex:1;min-width:0;gap:4px">
+            <div style="display:flex;align-items:center;flex:1;min-width:0;gap:4px;flex-wrap:wrap">
               <span class="roz-lvl1-name">${l1name}</span>
-              ${isFiltered(l1url)?fBadge:''}
-              ${l1link}
+              ${hasFilt(l1url) ? fBadge : ''}
+              ${l1Btn}
             </div>
             <div class="roz-lvl1-meta">
-              <span class="roz-traffic">${tFmt(l1data.traffic)}</span>
-              <span class="roz-count">${l1data.pages} стор.</span>
+              <span class="roz-traffic">${tFmt(l1d.traffic)}</span>
+              <span class="roz-count">${l1d.pages} стор.</span>
               <span class="roz-arrow">▼</span>
             </div>
           </div>
@@ -958,45 +1003,44 @@ function buildRozetkaTree(data, panel) {
               <span>Підкатегорія</span>
               <span style="display:flex;gap:10px"><span>Трафік</span><span>Стор.</span></span>
             </div>
-            ${subRows||'<div style="padding:16px 28px;font-size:11px;color:var(--muted)">Підкатегорій немає</div>'}
+            ${subRows || '<div style="padding:16px 28px;font-size:11px;color:var(--muted)">Підкатегорій немає</div>'}
           </div>
         </div>`;
       }).join('')}
     </div>`;
 }
 
-window.rozToggle = idx => {
-  document.getElementById(`rozCard${idx}`).classList.toggle('open');
-};
+window.rozToggle = idx => document.getElementById(`rozCard${idx}`).classList.toggle('open');
 
 window.rozToggleL3 = (id, arrow) => {
   const el = document.getElementById(id);
   if (!el) return;
-  const open = el.style.display === 'none';
-  el.style.display = open ? 'block' : 'none';
-  arrow.textContent = open ? '▾' : '▸';
+  const opening = el.style.display === 'none';
+  el.style.display = opening ? 'block' : 'none';
+  arrow.textContent = opening ? '▾' : '▸';
 };
 
 window.rozFilter = q => {
   const query = q.toLowerCase().trim();
   let vis = 0;
   document.querySelectorAll('.roz-lvl1-card').forEach(card => {
-    const nameMatch = !query || card.dataset.name.includes(query);
+    const nm = card.dataset.name || '';
     let subVis = 0;
     card.querySelectorAll('.roz-subcat-row').forEach(row => {
-      const rowName = row.dataset.name||'';
-      const l3Match = [...row.querySelectorAll('.roz-lvl3-row')].some(r3 => (r3.dataset.name||'').includes(query));
-      const show = !query || rowName.includes(query) || l3Match;
+      const rn = row.dataset.name || '';
+      const l3m = [...row.querySelectorAll('.roz-lvl3-row')].some(r3 => (r3.dataset.name||'').includes(query));
+      const show = !query || rn.includes(query) || l3m;
       row.style.display = show ? '' : 'none';
       if (show) subVis++;
     });
-    const show = nameMatch || subVis > 0;
+    const show = !query || nm.includes(query) || subVis > 0;
     card.style.display = show ? '' : 'none';
     if (show) { vis++; if (query && subVis > 0) card.classList.add('open'); }
   });
   const el = document.getElementById('rozCount');
   if (el) el.textContent = `${vis} категорій`;
 };
+
 
 async function showCharts(btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -1125,7 +1169,12 @@ function buildCharts(pages, keywords) {
 
   function buildCat(comp) {
     const d = pages
-      .filter(r => r.page_type==='category' && (comp==='__all'||r.competitor===comp))
+      .filter(r => {
+        if (comp!=='__all' && r.competitor!==comp) return false;
+        if (r.page_type === 'category' || r.page_type === 'subcategory') return true;
+        const u = (r.url||'').toLowerCase();
+        return /\/c\d{3,}\//.test(u) || u.includes('/categories/') || (/\/ua\/\d{3,}[-\/]/.test(u) && !u.includes('/pr'));
+      })
       .sort((a,b) => (parseInt(b.traffic)||0)-(parseInt(a.traffic)||0))
       .slice(0,15);
     document.getElementById('titleCat').textContent = `Топ-${d.length} категорій по трафіку`;
@@ -1141,7 +1190,12 @@ function buildCharts(pages, keywords) {
 
   function buildProd(comp) {
     const d = pages
-      .filter(r => r.page_type==='product' && (comp==='__all'||r.competitor===comp))
+      .filter(r => {
+        if (comp!=='__all' && r.competitor!==comp) return false;
+        if (r.page_type === 'product') return true;
+        const u = (r.url||'').toLowerCase();
+        return /\/pr\d+/.test(u) || /\/p\d{5,}\//.test(u) || u.includes('/products/');
+      })
       .sort((a,b) => (parseInt(b.traffic)||0)-(parseInt(a.traffic)||0))
       .slice(0,15);
     document.getElementById('titleProd').textContent = `Топ-${d.length} продуктових сторінок`;
