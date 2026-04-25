@@ -418,6 +418,11 @@ td {
 .rzk-pages { font-size:10px; color:var(--muted); margin-left:8px; white-space:nowrap; }
 .rzk-empty { padding:60px; text-align:center; color:var(--muted); font-size:12px; }
 
+/* TRENDS */
+.trend-dir-up   { color: var(--accent); font-weight:700; }
+.trend-dir-down { color: var(--warn);   font-weight:700; }
+.trend-dir-flat { color: var(--muted); }
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 </head>
@@ -466,6 +471,7 @@ td {
     <button class="tab" onclick="switchTab('keywords_top_volume', this)">Топ за об'ємом</button>
     <button class="tab" onclick="showRozetka(this)">Категорії Rozetka</button>
     <button class="tab" onclick="showCharts(this)">Графіки</button>
+    <button class="tab" onclick="showTrends(this)">Тренди</button>
   </div>
 
   <div class="filters" id="filtersBar">
@@ -495,6 +501,7 @@ td {
 
   <div id="chartsPanel" style="display:none"></div>
   <div id="rozetkaPanel" style="display:none"></div>
+  <div id="trendsPanel" style="display:none"></div>
 
   <div id="tableWrap" class="table-wrap">
     <div class="table-header">
@@ -795,6 +802,7 @@ async function switchTab(sheet, btn) {
   btn.classList.add('active');
   document.getElementById('chartsPanel').style.display  = 'none';
   document.getElementById('rozetkaPanel').style.display = 'none';
+  document.getElementById('trendsPanel').style.display  = 'none';
   document.getElementById('tableWrap').style.display    = '';
   document.getElementById('filtersBar').style.display   = '';
   currentSheet = sheet;
@@ -819,6 +827,7 @@ async function showRozetka(btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('chartsPanel').style.display  = 'none';
+  document.getElementById('trendsPanel').style.display  = 'none';
   document.getElementById('tableWrap').style.display    = 'none';
   document.getElementById('filtersBar').style.display   = 'none';
   const panel = document.getElementById('rozetkaPanel');
@@ -1047,6 +1056,7 @@ async function showCharts(btn) {
   btn.classList.add('active');
   document.getElementById('chartsPanel').style.display  = 'block';
   document.getElementById('rozetkaPanel').style.display = 'none';
+  document.getElementById('trendsPanel').style.display  = 'none';
   document.getElementById('tableWrap').style.display    = 'none';
   document.getElementById('filtersBar').style.display   = 'none';
   if (window._chartsBuilt) return;
@@ -1305,6 +1315,7 @@ async function showRozetkaCategories(btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('chartsPanel').style.display  = 'none';
+  document.getElementById('trendsPanel').style.display  = 'none';
   document.getElementById('tableWrap').style.display    = 'none';
   document.getElementById('filtersBar').style.display   = 'none';
   document.getElementById('rozetkaPanel').style.display = 'block';
@@ -1450,6 +1461,268 @@ async function init() {
 }
 
 init();
+
+// ── GOOGLE TRENDS ─────────────────────────────────────────────────────────────
+let _trendsRaw  = null;
+let _trendsChart = null;
+
+const TREND_PALETTE = [
+  '#00e5a0','#7c6af7','#fda110','#00d4ff','#ff6b6b',
+  '#ffc800','#00b8d4','#f06292','#aed581','#ba68c8',
+  '#4dd0e1','#ff8a65','#a5d6a7','#90caf9','#ce93d8',
+  '#80cbc4','#ffb300','#ef9a9a','#80deea','#b39ddb'
+];
+
+async function showTrends(btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('chartsPanel').style.display  = 'none';
+  document.getElementById('rozetkaPanel').style.display = 'none';
+  document.getElementById('tableWrap').style.display    = 'none';
+  document.getElementById('filtersBar').style.display   = 'none';
+  document.getElementById('trendsPanel').style.display  = 'block';
+
+  if (_trendsRaw !== null) return;
+
+  document.getElementById('trendsPanel').innerHTML =
+    '<div class="loading"><div class="spinner"></div> Завантажуємо Google Trends...</div>';
+
+  try {
+    _trendsRaw = await fetchCSV('google_trends');
+    if (!_trendsRaw.length) {
+      document.getElementById('trendsPanel').innerHTML =
+        '<div class="error-msg">Дані відсутні — спочатку запусти ячейку Google Trends у Colab-скрипті</div>';
+      return;
+    }
+    buildTrendsUI();
+  } catch(e) {
+    document.getElementById('trendsPanel').innerHTML =
+      `<div class="error-msg">⚠ Не вдалося завантажити google_trends<br><small style="color:var(--muted)">${e.message}</small></div>`;
+  }
+}
+
+function buildTrendsUI() {
+  const panel = document.getElementById('trendsPanel');
+  const dates = [...new Set((_trendsRaw||[]).map(r=>r.week_date).filter(Boolean))].sort();
+  const minD = dates[0]  || '2025-01-01';
+  const maxD = dates[dates.length-1] || '2025-12-31';
+
+  panel.innerHTML = `
+    <div style="padding:20px 0">
+
+      <div class="filters" style="margin-bottom:16px">
+        <span class="filter-label">Від:</span>
+        <input type="date" class="filter-select" id="trendFrom" value="${minD}" onchange="buildTrendsChart();buildTrendsTable()">
+        <span class="filter-label">До:</span>
+        <input type="date" class="filter-select" id="trendTo"   value="${maxD}" onchange="buildTrendsChart();buildTrendsTable()">
+        <span class="filter-label">Ключів на графіку:</span>
+        <select class="filter-select" id="trendTopN" onchange="buildTrendsChart()">
+          <option value="5">Топ 5</option>
+          <option value="10" selected>Топ 10</option>
+          <option value="20">Топ 20</option>
+          <option value="50">Топ 50</option>
+        </select>
+        <input class="search-input" id="trendSearch" placeholder="Пошук ключа..." oninput="buildTrendsTable()" style="width:200px">
+      </div>
+
+      <div class="table-wrap" style="margin-bottom:12px">
+        <div class="table-header">
+          <span class="table-title">Динаміка трендів Google (тижнева розбивка)</span>
+          <span class="table-count" id="trendsChartInfo"></span>
+        </div>
+        <div style="padding:20px;position:relative;height:420px">
+          <canvas id="chTrends"></canvas>
+        </div>
+      </div>
+
+      <div id="trendKwToggles" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;padding:2px 0"></div>
+
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-title">Всі ключові слова</span>
+          <span class="table-count" id="trendsTableCount"></span>
+        </div>
+        <div id="trendsTableBody"></div>
+      </div>
+
+    </div>`;
+
+  buildTrendsChart();
+  buildTrendsTable();
+}
+
+function _trendsFiltered() {
+  const from = document.getElementById('trendFrom')?.value || '';
+  const to   = document.getElementById('trendTo')?.value   || '';
+  return (_trendsRaw || []).filter(r => {
+    if (from && r.week_date < from) return false;
+    if (to   && r.week_date > to)   return false;
+    return true;
+  });
+}
+
+function buildTrendsChart() {
+  const data  = _trendsFiltered();
+  const topN  = parseInt(document.getElementById('trendTopN')?.value || 10);
+  const weeks = [...new Set(data.map(r => r.week_date))].sort();
+
+  const kwMap = {};
+  data.forEach(r => {
+    if (!kwMap[r.keyword]) kwMap[r.keyword] = {};
+    kwMap[r.keyword][r.week_date] = parseInt(r.value) || 0;
+  });
+
+  const kwAvg = Object.entries(kwMap).map(([kw, pts]) => {
+    const vals = Object.values(pts);
+    return { kw, avg: vals.reduce((s,v)=>s+v,0) / vals.length };
+  }).sort((a,b) => b.avg - a.avg);
+
+  const topKws = kwAvg.slice(0, topN).map(x => x.kw);
+
+  const datasets = topKws.map((kw, i) => ({
+    label: kw,
+    data: weeks.map(w => kwMap[kw]?.[w] ?? null),
+    borderColor: TREND_PALETTE[i % TREND_PALETTE.length],
+    backgroundColor: TREND_PALETTE[i % TREND_PALETTE.length] + '18',
+    borderWidth: 2,
+    pointRadius: weeks.length > 30 ? 0 : 2,
+    pointHoverRadius: 4,
+    tension: 0.3,
+    spanGaps: true,
+  }));
+
+  if (_trendsChart) _trendsChart.destroy();
+  const ctx = document.getElementById('chTrends');
+  if (!ctx) return;
+
+  _trendsChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels: weeks, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1a1a24',
+          borderColor: '#2a2a38',
+          borderWidth: 1,
+          titleColor: '#6b6b88',
+          bodyColor: '#e8e8f0',
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y ?? '—'}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            color:'#6b6b88', font:{size:9}, maxTicksLimit:16,
+            callback: (v,i) => weeks[i] ? weeks[i].slice(5) : ''
+          },
+          grid: { color:'rgba(42,42,56,.5)' }
+        },
+        y: {
+          min:0, max:100,
+          ticks: { color:'#6b6b88', font:{size:10} },
+          grid: { color:'rgba(42,42,56,.5)' },
+          title: { display:true, text:'Відносний інтерес (0–100)', color:'#6b6b88', font:{size:10} }
+        }
+      }
+    }
+  });
+
+  const togglesEl = document.getElementById('trendKwToggles');
+  if (togglesEl) {
+    togglesEl.innerHTML = topKws.map((kw, i) => {
+      const c = TREND_PALETTE[i % TREND_PALETTE.length];
+      return `<button onclick="toggleTrendKw(${i},this)"
+        style="padding:3px 10px;border-radius:4px;font-size:10px;cursor:pointer;
+               border:1.5px solid ${c};background:${c};color:#000;
+               font-family:'JetBrains Mono',monospace;transition:opacity .15s">${kw}</button>`;
+    }).join('');
+  }
+
+  document.getElementById('trendsChartInfo').textContent =
+    `${topKws.length} ключів · ${weeks.length} тижнів`;
+}
+
+window.toggleTrendKw = (idx, btn) => {
+  if (!_trendsChart) return;
+  const visible = _trendsChart.isDatasetVisible(idx);
+  if (visible) { _trendsChart.hide(idx); btn.style.opacity = '0.3'; }
+  else         { _trendsChart.show(idx); btn.style.opacity = '1';   }
+};
+
+function buildTrendsTable() {
+  const data   = _trendsFiltered();
+  const search = (document.getElementById('trendSearch')?.value || '').toLowerCase();
+
+  const kwMap = {};
+  data.forEach(r => {
+    const kw = r.keyword;
+    if (!kwMap[kw]) kwMap[kw] = { vals:[], dates:[] };
+    kwMap[kw].vals.push(parseInt(r.value) || 0);
+    kwMap[kw].dates.push(r.week_date);
+  });
+
+  let rows = Object.entries(kwMap).map(([kw, d]) => {
+    const vals  = d.vals;
+    const avg   = vals.reduce((s,v)=>s+v,0) / vals.length;
+    const maxV  = Math.max(...vals);
+    const maxIdx = vals.indexOf(maxV);
+    const peakWk = d.dates[maxIdx] || '';
+    const sorted = d.dates.map((dt,i)=>({dt,v:vals[i]})).sort((a,b)=>a.dt.localeCompare(b.dt));
+    const n = sorted.length;
+    const take = Math.min(4, Math.floor(n/2)) || 1;
+    const firstAvg = sorted.slice(0,take).reduce((s,x)=>s+x.v,0)/take;
+    const lastAvg  = sorted.slice(-take).reduce((s,x)=>s+x.v,0)/take;
+    const dir = lastAvg > firstAvg*1.12 ? 'up' : lastAvg < firstAvg*0.88 ? 'down' : 'flat';
+    return { kw, avg, maxV, peakWk, dir };
+  });
+
+  if (search) rows = rows.filter(r => r.kw.toLowerCase().includes(search));
+  rows.sort((a,b) => b.avg - a.avg);
+
+  document.getElementById('trendsTableCount').textContent = `${rows.length} ключів`;
+
+  const dirHtml = d => d==='up'
+    ? '<span class="trend-dir-up">▲ зростає</span>'
+    : d==='down'
+    ? '<span class="trend-dir-down">▼ падає</span>'
+    : '<span class="trend-dir-flat">— стабільно</span>';
+
+  const barHtml = avg => `<div style="display:flex;align-items:center;gap:6px">
+    <div style="width:70px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;flex-shrink:0">
+      <div style="width:${avg.toFixed(0)}%;height:100%;background:var(--accent2);border-radius:2px"></div>
+    </div>
+    <span style="font-variant-numeric:tabular-nums">${avg.toFixed(0)}</span>
+  </div>`;
+
+  document.getElementById('trendsTableBody').innerHTML = rows.length ? `
+    <table>
+      <thead><tr>
+        <th>#</th>
+        <th>Ключ</th>
+        <th class="num">Сер. інтерес</th>
+        <th class="num">Пік</th>
+        <th>Тиждень піку</th>
+        <th class="num">Тренд</th>
+      </tr></thead>
+      <tbody>${rows.map((r,i) => `<tr>
+        <td style="color:var(--muted);font-size:11px">${i+1}</td>
+        <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          <a href="https://trends.google.com/trends/explore?q=${encodeURIComponent(r.kw)}&geo=UA"
+             target="_blank" style="color:var(--accent);text-decoration:none" title="Відкрити в Google Trends">${r.kw}</a>
+        </td>
+        <td class="num">${barHtml(r.avg)}</td>
+        <td class="num" style="color:var(--text)">${r.maxV}</td>
+        <td style="font-size:11px;color:var(--muted)">${r.peakWk}</td>
+        <td class="num">${dirHtml(r.dir)}</td>
+      </tr>`).join('')}</tbody>
+    </table>`
+    : '<div class="empty">Нічого не знайдено</div>';
+}
 </script>
 </body>
 </html>
