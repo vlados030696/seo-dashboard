@@ -547,9 +547,11 @@ async function fetchCSV(sheet) {
 }
 
 function parseCSV(text) {
+  // Remove UTF-8 BOM if present
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
   const lines = text.trim().split('\n');
   if (lines.length < 2) return [];
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').replace(/^﻿/, ''));
   return lines.slice(1).map(line => {
     const vals = [];
     let inQ = false, cur = '';
@@ -1490,6 +1492,17 @@ async function showTrends(btn) {
 
   try {
     _trendsRaw = await fetchCSV('silpo_keywords_trends');
+    // Normalize week_date: gviz may export dates in DD.MM.YYYY (Ukrainian locale)
+    _trendsRaw = _trendsRaw.map(r => {
+      if (r.week_date) {
+        const m = r.week_date.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+        if (m) r.week_date = `${m[3]}-${m[2]}-${m[1]}`;
+      }
+      if (r.value) r.value = String(r.value).replace(/\s/g, '');
+      return r;
+    });
+    console.log('[trends] loaded rows:', _trendsRaw.length,
+      'sample:', JSON.stringify(_trendsRaw.slice(0,2)));
     if (!_trendsRaw.length) {
       document.getElementById('trendsPanel').innerHTML =
         '<div class="error-msg">Дані відсутні — спочатку запусти trends.py</div>';
