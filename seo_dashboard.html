@@ -1466,6 +1466,7 @@ init();
 
 // ── GOOGLE TRENDS (silpo_keywords) ────────────────────────────────────────────
 let _trendsRaw   = null;   // long-format from silpo_keywords_trends
+let _kwVolume    = {};     // keyword → частотність з silpo_keywords
 let _trendsChart = null;
 let _selectedKw  = null;   // single keyword focused in chart
 
@@ -1503,6 +1504,19 @@ async function showTrends(btn) {
     });
     console.log('[trends] loaded rows:', _trendsRaw.length,
       'sample:', JSON.stringify(_trendsRaw.slice(0,2)));
+
+    // Підвантажуємо частотність з silpo_keywords (без блокування)
+    try {
+      const srcData = await fetchCSV('silpo_keywords');
+      srcData.forEach(r => {
+        const kw  = (r['Query'] || r['query'] || '').trim();
+        const raw = r['Частотність'] || r['частотність'] || r['Frequency'] || '';
+        const vol = parseInt(String(raw).replace(/\s/g, '')) || 0;
+        if (kw) _kwVolume[kw] = vol;
+      });
+      console.log('[trends] volume loaded for', Object.keys(_kwVolume).length, 'keywords');
+    } catch(e) { console.warn('[trends] volume load failed:', e.message); }
+
     if (!_trendsRaw.length) {
       document.getElementById('trendsPanel').innerHTML =
         '<div class="error-msg">Дані відсутні — спочатку запусти trends.py</div>';
@@ -1531,6 +1545,14 @@ function buildTrendsUI() {
     <div style="padding:20px 0">
 
       <div class="filters" style="margin-bottom:16px">
+        <button id="trendBackBtn" onclick="filterByCat('')"
+          style="display:none;padding:6px 14px;border-radius:7px;font-size:11px;cursor:pointer;
+                 border:1px solid var(--accent);background:transparent;color:var(--accent);
+                 font-family:'JetBrains Mono',monospace;transition:all .15s"
+          onmouseenter="this.style.background='var(--accent)';this.style.color='#000'"
+          onmouseleave="this.style.background='transparent';this.style.color='var(--accent)'">
+          ← Всі категорії
+        </button>
         <span class="filter-label">Від:</span>
         <input type="date" class="filter-select" id="trendFrom" value="${minD}" onchange="onTrendFilterChange()">
         <span class="filter-label">До:</span>
@@ -1597,6 +1619,9 @@ function onTrendFilterChange() {
 }
 
 function onTrendCatChange() {
+  const cat = document.getElementById('trendCat')?.value || '';
+  const backBtn = document.getElementById('trendBackBtn');
+  if (backBtn) backBtn.style.display = cat ? '' : 'none';
   _selectedKw = null;
   _hideSelectedBadge();
   _showTopNControls(true);
@@ -1835,7 +1860,8 @@ function buildTrendsTable() {
     const firstAvg = sorted.slice(0,take).reduce((s,x)=>s+x.v,0)/take;
     const lastAvg  = sorted.slice(-take).reduce((s,x)=>s+x.v,0)/take;
     const dir = lastAvg > firstAvg*1.12 ? 'up' : lastAvg < firstAvg*0.88 ? 'down' : 'flat';
-    return { kw, avg, maxV, peakWk, dir, cat: d.cat, par: d.par };
+    const vol = _kwVolume[kw] || 0;
+    return { kw, avg, maxV, peakWk, dir, cat: d.cat, par: d.par, vol };
   });
 
   if (search) rows = rows.filter(r =>
@@ -1843,7 +1869,7 @@ function buildTrendsTable() {
     r.cat.toLowerCase().includes(search) ||
     r.par.toLowerCase().includes(search)
   );
-  rows.sort((a,b) => b.avg - a.avg);
+  rows.sort((a,b) => b.vol !== a.vol ? b.vol - a.vol : b.avg - a.avg);
 
   document.getElementById('trendsTableCount').textContent = `${rows.length} ключів`;
 
@@ -1860,6 +1886,7 @@ function buildTrendsTable() {
     <span style="font-variant-numeric:tabular-nums">${avg.toFixed(0)}</span>
   </div>`;
 
+  const hasVolume = rows.some(r => r.vol > 0);
   document.getElementById('trendsTableBody').innerHTML = rows.length ? `
     <table>
       <thead><tr>
@@ -1867,6 +1894,7 @@ function buildTrendsTable() {
         <th>Ключ</th>
         <th>Батьківська категорія</th>
         <th>Категорія</th>
+        ${hasVolume ? '<th class="num">Частотність</th>' : ''}
         <th class="num">Сер. інтерес</th>
         <th class="num">Пік</th>
         <th>Тиждень піку</th>
@@ -1875,6 +1903,9 @@ function buildTrendsTable() {
       </tr></thead>
       <tbody>${rows.map((r,i) => {
         const safe = r.kw.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        const volCell = hasVolume
+          ? `<td class="num" style="color:var(--accent2);font-variant-numeric:tabular-nums">${r.vol ? fmtNum(r.vol) : '<span style="color:var(--muted)">—</span>'}</td>`
+          : '';
         return `<tr>
         <td style="color:var(--muted);font-size:11px">${i+1}</td>
         <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
@@ -1883,6 +1914,7 @@ function buildTrendsTable() {
         </td>
         <td style="font-size:11px;color:var(--muted)">${r.par}</td>
         <td style="font-size:11px;color:var(--muted)">${r.cat}</td>
+        ${volCell}
         <td class="num">${barHtml(r.avg)}</td>
         <td class="num" style="color:var(--text)">${r.maxV}</td>
         <td style="font-size:11px;color:var(--muted)">${r.peakWk}</td>
