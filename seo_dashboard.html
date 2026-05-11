@@ -1467,6 +1467,7 @@ init();
 // ── GOOGLE TRENDS (silpo_keywords) ────────────────────────────────────────────
 let _trendsRaw   = null;   // long-format from silpo_keywords_trends
 let _kwVolume    = {};     // keyword → частотність з silpo_keywords
+let _relatedRaw  = null;   // пов'язані запити з silpo_keywords_related
 let _trendsChart = null;
 let _selectedKw  = null;   // single keyword focused in chart
 
@@ -1592,7 +1593,10 @@ function buildTrendsUI() {
         </div>
       </div>
 
-      <div id="trendKwToggles" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px;padding:2px 0"></div>
+      <div id="trendKwToggles" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;padding:2px 0"></div>
+
+      <!-- Пов'язані запити (показується коли обраний конкретний ключ) -->
+      <div id="trendRelatedPanel" style="display:none;margin-bottom:20px"></div>
 
       <!-- Плитки категорій (показуються коли категорія не вибрана) -->
       <div id="trendCatGrid" style="margin-bottom:20px"></div>
@@ -1625,6 +1629,8 @@ function onTrendCatChange() {
   _selectedKw = null;
   _hideSelectedBadge();
   _showTopNControls(true);
+  const rp = document.getElementById('trendRelatedPanel');
+  if (rp) rp.style.display = 'none';
   buildTrendsChart();
   buildTrendsTable();
   buildCatGrid();
@@ -1649,6 +1655,7 @@ window.selectKeyword = kw => {
   if (name)  name.textContent = kw;
   _showTopNControls(false);
   buildTrendsChart();
+  buildRelatedPanel(kw);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
@@ -1657,6 +1664,8 @@ window.clearSelectedKw = () => {
   _hideSelectedBadge();
   _showTopNControls(true);
   buildTrendsChart();
+  const rp = document.getElementById('trendRelatedPanel');
+  if (rp) rp.style.display = 'none';
 };
 
 window.filterByCat = cat => {
@@ -1667,6 +1676,86 @@ window.filterByCat = cat => {
   }
   onTrendCatChange();
 };
+
+async function buildRelatedPanel(kw) {
+  const el = document.getElementById('trendRelatedPanel');
+  if (!el) return;
+
+  el.style.display = '';
+  el.innerHTML = '<div style="padding:12px 20px;color:var(--muted);font-size:11px">Завантажуємо пов\'язані запити...</div>';
+
+  // Ледаче завантаження
+  if (_relatedRaw === null) {
+    try {
+      _relatedRaw = await fetchCSV('silpo_keywords_related');
+    } catch(e) {
+      el.innerHTML = `<div style="padding:12px 20px;font-size:11px;color:var(--warn)">Лист silpo_keywords_related не знайдено — спочатку запусти trends.py</div>`;
+      return;
+    }
+  }
+
+  const rows = (_relatedRaw || []).filter(r => r.keyword === kw);
+  if (!rows.length) {
+    el.innerHTML = `<div style="padding:12px 20px;font-size:11px;color:var(--muted)">Пов'язані запити відсутні для «${kw}»</div>`;
+    return;
+  }
+
+  const top    = rows.filter(r => r.query_type === 'top')
+                     .sort((a,b) => (parseInt(b.value)||0) - (parseInt(a.value)||0))
+                     .slice(0, 5);
+  const rising = rows.filter(r => r.query_type === 'rising')
+                     .slice(0, 5);
+
+  const chipTop = q => {
+    const v = parseInt(q.value) || 0;
+    const w = v ? Math.max(10, v) : 10;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid rgba(42,42,56,.4)">
+      <span style="flex:1;font-size:12px;color:var(--text)">${q.related_query}</span>
+      <div style="width:80px;height:3px;background:var(--border);border-radius:2px;flex-shrink:0">
+        <div style="width:${w}%;height:3px;background:var(--accent2);border-radius:2px"></div>
+      </div>
+      <span style="font-size:11px;color:var(--accent2);min-width:28px;text-align:right;font-variant-numeric:tabular-nums">${v || '—'}</span>
+      <a href="https://trends.google.com/trends/explore?q=${encodeURIComponent(q.related_query)}&geo=UA"
+         target="_blank" style="font-size:10px;color:var(--muted);text-decoration:none;flex-shrink:0"
+         title="Відкрити в Google Trends">↗</a>
+    </div>`;
+  };
+
+  const chipRising = q => {
+    const isBreakout = String(q.value).toLowerCase().includes('breakout');
+    const badge = isBreakout
+      ? `<span style="font-size:9px;background:rgba(0,229,160,.15);color:var(--accent);border:1px solid rgba(0,229,160,.3);border-radius:3px;padding:1px 6px;white-space:nowrap">🔥 Breakout</span>`
+      : `<span style="font-size:11px;color:var(--accent);font-variant-numeric:tabular-nums">+${q.value}%</span>`;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid rgba(42,42,56,.4)">
+      <span style="flex:1;font-size:12px;color:var(--text)">${q.related_query}</span>
+      ${badge}
+      <a href="https://trends.google.com/trends/explore?q=${encodeURIComponent(q.related_query)}&geo=UA"
+         target="_blank" style="font-size:10px;color:var(--muted);text-decoration:none;flex-shrink:0"
+         title="Відкрити в Google Trends">↗</a>
+    </div>`;
+  };
+
+  el.innerHTML = `
+    <div class="table-wrap">
+      <div class="table-header">
+        <span class="table-title">Пов'язані запити — ${kw}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
+        <div style="padding:14px 20px;border-right:1px solid var(--border)">
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">
+            Топ запити <span style="color:var(--accent2)">(за інтересом 0–100)</span>
+          </div>
+          ${top.length ? top.map(chipTop).join('') : '<div style="font-size:11px;color:var(--muted)">Немає даних</div>'}
+        </div>
+        <div style="padding:14px 20px">
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">
+            Зростаючі запити <span style="color:var(--accent)">(швидкий ріст)</span>
+          </div>
+          ${rising.length ? rising.map(chipRising).join('') : '<div style="font-size:11px;color:var(--muted)">Немає даних</div>'}
+        </div>
+      </div>
+    </div>`;
+}
 
 function _trendsFiltered() {
   const from   = document.getElementById('trendFrom')?.value || '';
