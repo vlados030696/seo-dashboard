@@ -1635,6 +1635,7 @@ function _trendsFiltered() {
   const to     = document.getElementById('trendTo')?.value   || '';
   const parCat = document.getElementById('trendCat')?.value  || '';
   return (_trendsRaw || []).filter(r => {
+    if (!r.keyword || !r.week_date) return false;   // пропускаємо порожні рядки CSV
     if (from   && r.week_date < from)             return false;
     if (to     && r.week_date > to)               return false;
     if (parCat && r.parent_category !== parCat)   return false;
@@ -1644,7 +1645,7 @@ function _trendsFiltered() {
 
 function buildTrendsChart() {
   const data  = _trendsFiltered();
-  const weeks = [...new Set(data.map(r => r.week_date))].sort();
+  const weeks = [...new Set(data.map(r => r.week_date).filter(Boolean))].sort();
 
   const kwMap = {};
   data.forEach(r => {
@@ -1800,6 +1801,7 @@ function buildTrendsTable() {
   const kwMap = {};
   data.forEach(r => {
     const kw = r.keyword;
+    if (!kw || !r.week_date) return;   // пропускаємо некоректні рядки
     if (!kwMap[kw]) kwMap[kw] = { vals:[], dates:[], cat: r.category||'', par: r.parent_category||'' };
     kwMap[kw].vals.push(parseInt(r.value) || 0);
     kwMap[kw].dates.push(r.week_date);
@@ -1811,7 +1813,10 @@ function buildTrendsTable() {
     const maxV    = Math.max(...vals);
     const maxIdx  = vals.indexOf(maxV);
     const peakWk  = d.dates[maxIdx] || '';
-    const sorted  = d.dates.map((dt,i)=>({dt,v:vals[i]})).sort((a,b)=>a.dt.localeCompare(b.dt));
+    const sorted  = d.dates
+      .map((dt,i) => ({dt, v: vals[i]}))
+      .filter(x => x.dt)
+      .sort((a,b) => (a.dt||'').localeCompare(b.dt||''));
     const n       = sorted.length;
     const take    = Math.min(4, Math.floor(n/2)) || 1;
     const firstAvg = sorted.slice(0,take).reduce((s,x)=>s+x.v,0)/take;
