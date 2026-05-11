@@ -1462,9 +1462,10 @@ async function init() {
 
 init();
 
-// ── GOOGLE TRENDS ─────────────────────────────────────────────────────────────
-let _trendsRaw  = null;
+// ── GOOGLE TRENDS (silpo_keywords) ────────────────────────────────────────────
+let _trendsRaw   = null;   // long-format from silpo_keywords_trends
 let _trendsChart = null;
+let _selectedKw  = null;   // single keyword focused in chart
 
 const TREND_PALETTE = [
   '#00e5a0','#7c6af7','#fda110','#00d4ff','#ff6b6b',
@@ -1488,46 +1489,67 @@ async function showTrends(btn) {
     '<div class="loading"><div class="spinner"></div> Завантажуємо Google Trends...</div>';
 
   try {
-    _trendsRaw = await fetchCSV('google_trends');
+    _trendsRaw = await fetchCSV('silpo_keywords_trends');
     if (!_trendsRaw.length) {
       document.getElementById('trendsPanel').innerHTML =
-        '<div class="error-msg">Дані відсутні — спочатку запусти ячейку Google Trends у Colab-скрипті</div>';
+        '<div class="error-msg">Дані відсутні — спочатку запусти trends.py</div>';
       return;
     }
     buildTrendsUI();
   } catch(e) {
     document.getElementById('trendsPanel').innerHTML =
-      `<div class="error-msg">⚠ Не вдалося завантажити google_trends<br><small style="color:var(--muted)">${e.message}</small></div>`;
+      `<div class="error-msg">⚠ Не вдалося завантажити silpo_keywords_trends<br><small style="color:var(--muted)">${e.message}</small></div>`;
   }
 }
 
 function buildTrendsUI() {
   const panel = document.getElementById('trendsPanel');
   const dates = [...new Set((_trendsRaw||[]).map(r=>r.week_date).filter(Boolean))].sort();
-  const minD = dates[0]  || '2025-01-01';
-  const maxD = dates[dates.length-1] || '2025-12-31';
+  const minD  = dates[0]              || '2026-01-01';
+  const maxD  = dates[dates.length-1] || '2026-05-01';
+
+  // Build parent-category options
+  const parCats = [...new Set((_trendsRaw||[])
+    .map(r => r.parent_category || '').filter(Boolean))].sort();
+  const catOptions = parCats.map(c =>
+    `<option value="${c.replace(/"/g,'&quot;')}">${c}</option>`).join('');
 
   panel.innerHTML = `
     <div style="padding:20px 0">
 
       <div class="filters" style="margin-bottom:16px">
         <span class="filter-label">Від:</span>
-        <input type="date" class="filter-select" id="trendFrom" value="${minD}" onchange="buildTrendsChart();buildTrendsTable()">
+        <input type="date" class="filter-select" id="trendFrom" value="${minD}" onchange="onTrendFilterChange()">
         <span class="filter-label">До:</span>
-        <input type="date" class="filter-select" id="trendTo"   value="${maxD}" onchange="buildTrendsChart();buildTrendsTable()">
-        <span class="filter-label">Ключів на графіку:</span>
+        <input type="date" class="filter-select" id="trendTo"   value="${maxD}" onchange="onTrendFilterChange()">
+        <span class="filter-label">Категорія:</span>
+        <select class="filter-select" id="trendCat" onchange="onTrendCatChange()">
+          <option value="">Всі категорії</option>
+          ${catOptions}
+        </select>
+        <span class="filter-label" id="trendTopNLabel">Ключів на графіку:</span>
         <select class="filter-select" id="trendTopN" onchange="buildTrendsChart()">
           <option value="5">Топ 5</option>
           <option value="10" selected>Топ 10</option>
           <option value="20">Топ 20</option>
-          <option value="50">Топ 50</option>
         </select>
         <input class="search-input" id="trendSearch" placeholder="Пошук ключа..." oninput="buildTrendsTable()" style="width:200px">
       </div>
 
+      <!-- Виділений ключ -->
+      <div id="trendSelectedBadge" style="display:none;margin-bottom:12px;align-items:center;gap:10px">
+        <span style="font-size:11px;color:var(--muted)">Ключ:</span>
+        <span id="trendSelectedName" style="color:var(--accent);font-weight:700;font-size:13px"></span>
+        <button onclick="clearSelectedKw()"
+          style="padding:2px 10px;border-radius:4px;font-size:10px;cursor:pointer;
+                 border:1px solid var(--warn);background:transparent;color:var(--warn);
+                 font-family:'JetBrains Mono',monospace">✕ очистити</button>
+      </div>
+
+      <!-- Графік -->
       <div class="table-wrap" style="margin-bottom:12px">
         <div class="table-header">
-          <span class="table-title">Динаміка трендів Google (тижнева розбивка)</span>
+          <span class="table-title" id="trendsChartTitle">Динаміка Google Trends (тижнева)</span>
           <span class="table-count" id="trendsChartInfo"></span>
         </div>
         <div style="padding:20px;position:relative;height:420px">
@@ -1535,11 +1557,15 @@ function buildTrendsUI() {
         </div>
       </div>
 
-      <div id="trendKwToggles" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;padding:2px 0"></div>
+      <div id="trendKwToggles" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px;padding:2px 0"></div>
 
+      <!-- Плитки категорій (показуються коли категорія не вибрана) -->
+      <div id="trendCatGrid" style="margin-bottom:20px"></div>
+
+      <!-- Таблиця ключів -->
       <div class="table-wrap">
         <div class="table-header">
-          <span class="table-title">Всі ключові слова</span>
+          <span class="table-title">Ключові слова</span>
           <span class="table-count" id="trendsTableCount"></span>
         </div>
         <div id="trendsTableBody"></div>
@@ -1549,21 +1575,75 @@ function buildTrendsUI() {
 
   buildTrendsChart();
   buildTrendsTable();
+  buildCatGrid();
 }
 
+function onTrendFilterChange() {
+  buildTrendsChart();
+  buildTrendsTable();
+}
+
+function onTrendCatChange() {
+  _selectedKw = null;
+  _hideSelectedBadge();
+  _showTopNControls(true);
+  buildTrendsChart();
+  buildTrendsTable();
+  buildCatGrid();
+}
+
+function _hideSelectedBadge() {
+  const b = document.getElementById('trendSelectedBadge');
+  if (b) b.style.display = 'none';
+}
+function _showTopNControls(visible) {
+  const lbl = document.getElementById('trendTopNLabel');
+  const sel = document.getElementById('trendTopN');
+  if (lbl) lbl.style.display = visible ? '' : 'none';
+  if (sel) sel.style.display = visible ? '' : 'none';
+}
+
+window.selectKeyword = kw => {
+  _selectedKw = kw;
+  const badge = document.getElementById('trendSelectedBadge');
+  const name  = document.getElementById('trendSelectedName');
+  if (badge) badge.style.display = 'flex';
+  if (name)  name.textContent = kw;
+  _showTopNControls(false);
+  buildTrendsChart();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+window.clearSelectedKw = () => {
+  _selectedKw = null;
+  _hideSelectedBadge();
+  _showTopNControls(true);
+  buildTrendsChart();
+};
+
+window.filterByCat = cat => {
+  const sel = document.getElementById('trendCat');
+  if (!sel) return;
+  for (const opt of sel.options) {
+    if (opt.value === cat) { sel.value = cat; break; }
+  }
+  onTrendCatChange();
+};
+
 function _trendsFiltered() {
-  const from = document.getElementById('trendFrom')?.value || '';
-  const to   = document.getElementById('trendTo')?.value   || '';
+  const from   = document.getElementById('trendFrom')?.value || '';
+  const to     = document.getElementById('trendTo')?.value   || '';
+  const parCat = document.getElementById('trendCat')?.value  || '';
   return (_trendsRaw || []).filter(r => {
-    if (from && r.week_date < from) return false;
-    if (to   && r.week_date > to)   return false;
+    if (from   && r.week_date < from)             return false;
+    if (to     && r.week_date > to)               return false;
+    if (parCat && r.parent_category !== parCat)   return false;
     return true;
   });
 }
 
 function buildTrendsChart() {
   const data  = _trendsFiltered();
-  const topN  = parseInt(document.getElementById('trendTopN')?.value || 10);
   const weeks = [...new Set(data.map(r => r.week_date))].sort();
 
   const kwMap = {};
@@ -1572,21 +1652,33 @@ function buildTrendsChart() {
     kwMap[r.keyword][r.week_date] = parseInt(r.value) || 0;
   });
 
-  const kwAvg = Object.entries(kwMap).map(([kw, pts]) => {
-    const vals = Object.values(pts);
-    return { kw, avg: vals.reduce((s,v)=>s+v,0) / vals.length };
-  }).sort((a,b) => b.avg - a.avg);
+  let topKws;
+  const titleEl = document.getElementById('trendsChartTitle');
 
-  const topKws = kwAvg.slice(0, topN).map(x => x.kw);
+  if (_selectedKw && kwMap[_selectedKw]) {
+    topKws = [_selectedKw];
+    if (titleEl) titleEl.textContent = `Тренд: ${_selectedKw}`;
+  } else {
+    const topN  = parseInt(document.getElementById('trendTopN')?.value || 10);
+    const kwAvg = Object.entries(kwMap).map(([kw, pts]) => {
+      const vals = Object.values(pts);
+      return { kw, avg: vals.reduce((s,v) => s+v, 0) / vals.length };
+    }).sort((a,b) => b.avg - a.avg);
+    topKws = kwAvg.slice(0, topN).map(x => x.kw);
+    const cat = document.getElementById('trendCat')?.value || '';
+    if (titleEl) titleEl.textContent = cat
+      ? `Тренд: ${cat}`
+      : 'Динаміка Google Trends (тижнева)';
+  }
 
   const datasets = topKws.map((kw, i) => ({
     label: kw,
     data: weeks.map(w => kwMap[kw]?.[w] ?? null),
     borderColor: TREND_PALETTE[i % TREND_PALETTE.length],
-    backgroundColor: TREND_PALETTE[i % TREND_PALETTE.length] + '18',
-    borderWidth: 2,
+    backgroundColor: TREND_PALETTE[i % TREND_PALETTE.length] + '22',
+    borderWidth: _selectedKw ? 3 : 2,
     pointRadius: weeks.length > 30 ? 0 : 2,
-    pointHoverRadius: 4,
+    pointHoverRadius: 5,
     tension: 0.3,
     spanGaps: true,
   }));
@@ -1610,7 +1702,7 @@ function buildTrendsChart() {
           titleColor: '#6b6b88',
           bodyColor: '#e8e8f0',
           callbacks: {
-            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y ?? '—'}`
+            label: c => ` ${c.dataset.label}: ${c.parsed.y ?? '—'}`
           }
         }
       },
@@ -1634,17 +1726,21 @@ function buildTrendsChart() {
 
   const togglesEl = document.getElementById('trendKwToggles');
   if (togglesEl) {
-    togglesEl.innerHTML = topKws.map((kw, i) => {
-      const c = TREND_PALETTE[i % TREND_PALETTE.length];
-      return `<button onclick="toggleTrendKw(${i},this)"
-        style="padding:3px 10px;border-radius:4px;font-size:10px;cursor:pointer;
-               border:1.5px solid ${c};background:${c};color:#000;
-               font-family:'JetBrains Mono',monospace;transition:opacity .15s">${kw}</button>`;
-    }).join('');
+    if (_selectedKw) {
+      togglesEl.innerHTML = '';
+    } else {
+      togglesEl.innerHTML = topKws.map((kw, i) => {
+        const c = TREND_PALETTE[i % TREND_PALETTE.length];
+        return `<button onclick="toggleTrendKw(${i},this)"
+          style="padding:3px 10px;border-radius:4px;font-size:10px;cursor:pointer;
+                 border:1.5px solid ${c};background:${c};color:#000;
+                 font-family:'JetBrains Mono',monospace;transition:opacity .15s">${kw}</button>`;
+      }).join('');
+    }
   }
 
-  document.getElementById('trendsChartInfo').textContent =
-    `${topKws.length} ключів · ${weeks.length} тижнів`;
+  const infoEl = document.getElementById('trendsChartInfo');
+  if (infoEl) infoEl.textContent = `${topKws.length} ключів · ${weeks.length} тижнів`;
 }
 
 window.toggleTrendKw = (idx, btn) => {
@@ -1654,6 +1750,49 @@ window.toggleTrendKw = (idx, btn) => {
   else         { _trendsChart.show(idx); btn.style.opacity = '1';   }
 };
 
+function buildCatGrid() {
+  const el = document.getElementById('trendCatGrid');
+  if (!el) return;
+
+  const cat = document.getElementById('trendCat')?.value || '';
+  if (cat) { el.style.display = 'none'; return; }
+  el.style.display = '';
+
+  // Group by parent_category → set of keywords
+  const groups = {};
+  (_trendsRaw || []).forEach(r => {
+    const c = r.parent_category || r.category || 'Інше';
+    if (!groups[c]) groups[c] = { kws: new Set(), vals: [] };
+    groups[c].kws.add(r.keyword);
+    const v = parseInt(r.value) || 0;
+    if (v) groups[c].vals.push(v);
+  });
+
+  const sorted = Object.keys(groups).sort();
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:8px">
+      ${sorted.map(c => {
+        const g   = groups[c];
+        const avg = g.vals.length ? Math.round(g.vals.reduce((s,v)=>s+v,0)/g.vals.length) : 0;
+        const safe = c.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        return `
+        <div class="table-wrap"
+          onclick="filterByCat('${safe}')"
+          style="padding:14px 16px;cursor:pointer;transition:border-color .15s"
+          onmouseenter="this.style.borderColor='var(--accent)'"
+          onmouseleave="this.style.borderColor=''">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:6px;
+                      text-transform:uppercase;letter-spacing:.06em;
+                      white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c}</div>
+          <div style="font-size:20px;font-weight:700;color:var(--accent);line-height:1">${g.kws.size}</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px">ключів</div>
+          ${avg ? `<div style="font-size:10px;color:var(--accent2);margin-top:4px">∅ інтерес: ${avg}</div>` : ''}
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
 function buildTrendsTable() {
   const data   = _trendsFiltered();
   const search = (document.getElementById('trendSearch')?.value || '').toLowerCase();
@@ -1661,27 +1800,31 @@ function buildTrendsTable() {
   const kwMap = {};
   data.forEach(r => {
     const kw = r.keyword;
-    if (!kwMap[kw]) kwMap[kw] = { vals:[], dates:[] };
+    if (!kwMap[kw]) kwMap[kw] = { vals:[], dates:[], cat: r.category||'', par: r.parent_category||'' };
     kwMap[kw].vals.push(parseInt(r.value) || 0);
     kwMap[kw].dates.push(r.week_date);
   });
 
   let rows = Object.entries(kwMap).map(([kw, d]) => {
-    const vals  = d.vals;
-    const avg   = vals.reduce((s,v)=>s+v,0) / vals.length;
-    const maxV  = Math.max(...vals);
-    const maxIdx = vals.indexOf(maxV);
-    const peakWk = d.dates[maxIdx] || '';
-    const sorted = d.dates.map((dt,i)=>({dt,v:vals[i]})).sort((a,b)=>a.dt.localeCompare(b.dt));
-    const n = sorted.length;
-    const take = Math.min(4, Math.floor(n/2)) || 1;
+    const vals    = d.vals;
+    const avg     = vals.reduce((s,v)=>s+v,0) / vals.length;
+    const maxV    = Math.max(...vals);
+    const maxIdx  = vals.indexOf(maxV);
+    const peakWk  = d.dates[maxIdx] || '';
+    const sorted  = d.dates.map((dt,i)=>({dt,v:vals[i]})).sort((a,b)=>a.dt.localeCompare(b.dt));
+    const n       = sorted.length;
+    const take    = Math.min(4, Math.floor(n/2)) || 1;
     const firstAvg = sorted.slice(0,take).reduce((s,x)=>s+x.v,0)/take;
     const lastAvg  = sorted.slice(-take).reduce((s,x)=>s+x.v,0)/take;
     const dir = lastAvg > firstAvg*1.12 ? 'up' : lastAvg < firstAvg*0.88 ? 'down' : 'flat';
-    return { kw, avg, maxV, peakWk, dir };
+    return { kw, avg, maxV, peakWk, dir, cat: d.cat, par: d.par };
   });
 
-  if (search) rows = rows.filter(r => r.kw.toLowerCase().includes(search));
+  if (search) rows = rows.filter(r =>
+    r.kw.toLowerCase().includes(search) ||
+    r.cat.toLowerCase().includes(search) ||
+    r.par.toLowerCase().includes(search)
+  );
   rows.sort((a,b) => b.avg - a.avg);
 
   document.getElementById('trendsTableCount').textContent = `${rows.length} ключів`;
@@ -1694,7 +1837,7 @@ function buildTrendsTable() {
 
   const barHtml = avg => `<div style="display:flex;align-items:center;gap:6px">
     <div style="width:70px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;flex-shrink:0">
-      <div style="width:${avg.toFixed(0)}%;height:100%;background:var(--accent2);border-radius:2px"></div>
+      <div style="width:${Math.min(avg,100).toFixed(0)}%;height:100%;background:var(--accent2);border-radius:2px"></div>
     </div>
     <span style="font-variant-numeric:tabular-nums">${avg.toFixed(0)}</span>
   </div>`;
@@ -1704,22 +1847,36 @@ function buildTrendsTable() {
       <thead><tr>
         <th>#</th>
         <th>Ключ</th>
+        <th>Батьківська категорія</th>
+        <th>Категорія</th>
         <th class="num">Сер. інтерес</th>
         <th class="num">Пік</th>
         <th>Тиждень піку</th>
         <th class="num">Тренд</th>
+        <th></th>
       </tr></thead>
-      <tbody>${rows.map((r,i) => `<tr>
+      <tbody>${rows.map((r,i) => {
+        const safe = r.kw.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        return `<tr>
         <td style="color:var(--muted);font-size:11px">${i+1}</td>
-        <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
           <a href="https://trends.google.com/trends/explore?q=${encodeURIComponent(r.kw)}&geo=UA"
-             target="_blank" style="color:var(--accent);text-decoration:none" title="Відкрити в Google Trends">${r.kw}</a>
+             target="_blank" style="color:var(--accent);text-decoration:none">${r.kw}</a>
         </td>
+        <td style="font-size:11px;color:var(--muted)">${r.par}</td>
+        <td style="font-size:11px;color:var(--muted)">${r.cat}</td>
         <td class="num">${barHtml(r.avg)}</td>
         <td class="num" style="color:var(--text)">${r.maxV}</td>
         <td style="font-size:11px;color:var(--muted)">${r.peakWk}</td>
         <td class="num">${dirHtml(r.dir)}</td>
-      </tr>`).join('')}</tbody>
+        <td>
+          <button onclick="selectKeyword('${safe}')"
+            style="padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer;
+                   border:1px solid var(--accent2);background:transparent;color:var(--accent2);
+                   font-family:'JetBrains Mono',monospace;white-space:nowrap">📈 графік</button>
+        </td>
+      </tr>`;
+      }).join('')}</tbody>
     </table>`
     : '<div class="empty">Нічого не знайдено</div>';
 }
