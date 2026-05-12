@@ -1633,6 +1633,9 @@ function buildTrendsUI() {
       <!-- Плитки категорій (показуються коли категорія не вибрана) -->
       <div id="trendCatGrid" style="margin-bottom:20px"></div>
 
+      <!-- Зростаючі запити та ключі -->
+      <div id="trendOverviewTables" style="margin-bottom:20px"></div>
+
       <!-- Таблиця ключів -->
       <div class="table-wrap">
         <div class="table-header">
@@ -1647,6 +1650,7 @@ function buildTrendsUI() {
   buildTrendsChart();
   buildTrendsTable();
   buildCatGrid();
+  buildTrendsOverview();
 }
 
 function onTrendFilterChange() {
@@ -1666,6 +1670,7 @@ function onTrendCatChange() {
   buildTrendsChart();
   buildTrendsTable();
   buildCatGrid();
+  buildTrendsOverview();
 }
 
 function _hideSelectedBadge() {
@@ -1686,6 +1691,8 @@ window.selectKeyword = kw => {
   if (badge) badge.style.display = 'flex';
   if (name)  name.textContent = kw;
   _showTopNControls(false);
+  const ot = document.getElementById('trendOverviewTables');
+  if (ot) ot.style.display = 'none';
   buildTrendsChart();
   buildRelatedPanel(kw);
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1698,6 +1705,7 @@ window.clearSelectedKw = () => {
   buildTrendsChart();
   const rp = document.getElementById('trendRelatedPanel');
   if (rp) rp.style.display = 'none';
+  buildTrendsOverview();
 };
 
 window.filterByCat = cat => {
@@ -2050,6 +2058,151 @@ function buildTrendsTable() {
       }).join('')}</tbody>
     </table>`
     : '<div class="empty">Нічого не знайдено</div>';
+}
+
+// ── OVERVIEW: rising related queries + rising our keywords ─────────────────
+async function buildTrendsOverview() {
+  const el = document.getElementById('trendOverviewTables');
+  if (!el) return;
+  if (_selectedKw) { el.style.display = 'none'; return; }
+  el.style.display = '';
+
+  // ── Table 2: our rising keywords (синхронно з _trendsRaw) ─────────────────
+  const data = _trendsFiltered();
+  const kwMap2 = {};
+  data.forEach(r => {
+    const kw = r.keyword;
+    if (!kw || !r.week_date) return;
+    if (!kwMap2[kw]) kwMap2[kw] = { vals:[], dates:[], cat: r.category||'', par: r.parent_category||'' };
+    kwMap2[kw].vals.push(parseInt(r.value) || 0);
+    kwMap2[kw].dates.push(r.week_date);
+  });
+
+  const risingKws = Object.entries(kwMap2).map(([kw, d]) => {
+    const sorted = d.dates.map((dt,i) => ({dt, v: d.vals[i]}))
+      .filter(x => x.dt).sort((a,b) => a.dt.localeCompare(b.dt));
+    const n = sorted.length;
+    if (n < 6) return null;
+    const take = Math.max(2, Math.min(4, Math.floor(n/3)));
+    const firstAvg = sorted.slice(0, take).reduce((s,x)=>s+x.v,0) / take;
+    const lastAvg  = sorted.slice(-take).reduce((s,x)=>s+x.v,0) / take;
+    if (firstAvg < 3) return null;
+    const growth = (lastAvg - firstAvg) / firstAvg * 100;
+    const avg = d.vals.reduce((s,v)=>s+v,0) / d.vals.length;
+    return { kw, growth, avg, lastAvg: Math.round(lastAvg), cat: d.cat, par: d.par };
+  }).filter(x => x && x.growth > 5)
+    .sort((a,b) => b.growth - a.growth)
+    .slice(0, 50);
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-title">🔥 Зростаючі пов'язані запити</span>
+          <span class="table-count" id="risingRelatedCount">Завантажуємо...</span>
+        </div>
+        <div id="risingRelatedBody"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-title">📈 Наші зростаючі ключі</span>
+          <span class="table-count">${risingKws.length} ключів</span>
+        </div>
+        <div id="risingKwBody">${_buildRisingKwHTML(risingKws)}</div>
+      </div>
+    </div>`;
+
+  // ── Table 1: rising related queries (async) ────────────────────────────────
+  if (_relatedRaw === null) {
+    try {
+      _relatedRaw = await fetchCSV('silpo_keywords_related');
+    } catch(e) {
+      const b = document.getElementById('risingRelatedBody');
+      if (b) b.innerHTML = '<div style="padding:20px;font-size:11px;color:var(--warn)">Лист silpo_keywords_related не знайдено — запусти trends.py</div>';
+      const c = document.getElementById('risingRelatedCount');
+      if (c) c.textContent = '—';
+      return;
+    }
+  }
+
+  const risingRelated = (_relatedRaw || [])
+    .filter(r => r.query_type === 'rising')
+    .map(r => {
+      const isBreakout = String(r.value).toLowerCase().includes('breakout');
+      return { ...r, sortVal: isBreakout ? 999999 : (parseInt(r.value) || 0), isBreakout };
+    })
+    .sort((a,b) => b.sortVal - a.sortVal)
+    .slice(0, 50);
+
+  const bodyEl = document.getElementById('risingRelatedBody');
+  if (bodyEl) bodyEl.innerHTML = _buildRisingRelatedHTML(risingRelated);
+  const cntEl = document.getElementById('risingRelatedCount');
+  if (cntEl) cntEl.textContent = `${risingRelated.length} запитів`;
+}
+
+function _buildRisingRelatedHTML(rows) {
+  if (!rows.length) return '<div style="padding:20px;font-size:11px;color:var(--muted)">Немає даних</div>';
+  return `<table>
+    <thead><tr>
+      <th>#</th><th>Пов'язаний запит</th><th>Ключ</th><th class="num">Ріст</th>
+    </tr></thead>
+    <tbody>${rows.map((r,i) => {
+      const badge = r.isBreakout
+        ? `<span style="font-size:9px;background:rgba(0,229,160,.15);color:var(--accent);border:1px solid rgba(0,229,160,.3);border-radius:3px;padding:1px 6px;white-space:nowrap">🔥 Breakout</span>`
+        : `<span style="color:var(--accent);font-variant-numeric:tabular-nums;font-size:12px">+${r.value}%</span>`;
+      return `<tr>
+        <td style="color:var(--muted);font-size:11px">${i+1}</td>
+        <td>
+          <a href="https://trends.google.com/trends/explore?q=${encodeURIComponent(r.related_query)}&geo=UA"
+             target="_blank" style="color:var(--text);text-decoration:none"
+             onmouseenter="this.style.color='var(--accent)'"
+             onmouseleave="this.style.color='var(--text)'">${r.related_query}</a>
+        </td>
+        <td style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px">${r.keyword}</td>
+        <td class="num">${badge}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+function _buildRisingKwHTML(rows) {
+  if (!rows.length) return '<div style="padding:20px;font-size:11px;color:var(--muted)">Недостатньо даних для розрахунку (потрібно ≥6 тижнів)</div>';
+  const maxGrowth = rows[0]?.growth || 1;
+  return `<table>
+    <thead><tr>
+      <th>#</th><th>Ключ</th><th>Категорія</th>
+      <th class="num">Ріст</th><th class="num">Зараз</th><th></th>
+    </tr></thead>
+    <tbody>${rows.map((r,i) => {
+      const pct  = Math.min(100, r.growth / maxGrowth * 100);
+      const safe = r.kw.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      return `<tr>
+        <td style="color:var(--muted);font-size:11px">${i+1}</td>
+        <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          <a href="https://trends.google.com/trends/explore?q=${encodeURIComponent(r.kw)}&geo=UA"
+             target="_blank" style="color:var(--text);text-decoration:none"
+             onmouseenter="this.style.color='var(--accent)'"
+             onmouseleave="this.style.color='var(--text)'">${r.kw}</a>
+        </td>
+        <td style="font-size:11px;color:var(--muted)">${r.par || r.cat}</td>
+        <td class="num">
+          <div style="display:flex;align-items:center;gap:6px">
+            <div style="width:50px;height:3px;background:var(--border);border-radius:2px;flex-shrink:0;overflow:hidden">
+              <div style="width:${pct.toFixed(0)}%;height:100%;background:var(--accent);border-radius:2px"></div>
+            </div>
+            <span style="color:var(--accent);font-variant-numeric:tabular-nums">+${Math.round(r.growth)}%</span>
+          </div>
+        </td>
+        <td class="num" style="font-variant-numeric:tabular-nums">${r.lastAvg}</td>
+        <td>
+          <button onclick="selectKeyword('${safe}')"
+            style="padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer;
+                   border:1px solid var(--accent2);background:transparent;color:var(--accent2);
+                   font-family:'JetBrains Mono',monospace">📈</button>
+        </td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
 }
 </script>
 </body>
