@@ -445,6 +445,21 @@ td {
 .trend-dir-down { color: var(--warn);   font-weight:700; }
 .trend-dir-flat { color: var(--muted); }
 
+/* PAGES + KEYWORDS ACCORDION */
+.pk-page-row { cursor: pointer; }
+.pk-toggle { display:inline-block; width:16px; color:var(--muted); font-size:10px; transition:transform .2s, color .2s; }
+.pk-kw-row td { padding:0 !important; border-bottom:none !important; }
+.pk-kw-row { background: rgba(20,20,30,0.7) !important; }
+.pk-kw-inner { padding:10px 16px 12px 46px; border-top:1px solid rgba(42,42,56,.5); }
+.pk-kw-inner table { width:100%; border-collapse:collapse; }
+.pk-kw-inner thead th { padding:5px 10px; font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; border-bottom:1px solid var(--border); background:transparent; cursor:default; user-select:none; white-space:nowrap; }
+.pk-kw-inner tbody tr { border-bottom:0.5px solid rgba(42,42,56,.3); transition:background .1s; }
+.pk-kw-inner tbody tr:last-child { border-bottom:none; }
+.pk-kw-inner tbody tr:hover { background:rgba(255,255,255,.025); }
+.pk-kw-inner td { padding:5px 10px; font-size:11px; color:var(--text); }
+.pk-kw-more { padding:5px 10px; font-size:10px; color:var(--muted); font-style:italic; }
+.pk-empty-kw { padding:10px 16px 10px 46px; font-size:11px; color:var(--muted); font-style:italic; border-top:1px solid rgba(42,42,56,.5); }
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 </head>
@@ -490,6 +505,7 @@ td {
       <span class="navbar-label">Конкуренти</span>
       <div class="tabs">
         <button class="tab active" onclick="switchTab('pages_all', this)">Всі сторінки</button>
+        <button class="tab" onclick="switchTab('pages_with_keys', this)">Сторінки + Ключі</button>
         <button class="tab" onclick="switchTab('pages_new', this)">Нові сторінки</button>
         <button class="tab" onclick="switchTab('pages_type_summary', this)">Типи сторінок</button>
         <button class="tab" onclick="switchTab('keywords_all', this)">Ключові слова</button>
@@ -551,6 +567,7 @@ td {
 const SHEET_ID = '1COlbKcnpKLiqc9mJkfjv_wEOTGvDaDq9gtdbS55m0gM';
 const SHEETS = {
   pages_all:           { title: 'Всі сторінки конкурентів', type: 'pages' },
+  pages_with_keys:     { title: 'Сторінки з ключовими словами', type: 'pages_keys' },
   pages_new:           { title: 'Нові сторінки', type: 'pages_new' },
   pages_type_summary:  { title: 'Зведення по типах сторінок', type: 'summary' },
   keywords_all:        { title: 'Всі ключові слова', type: 'keywords' },
@@ -558,6 +575,7 @@ const SHEETS = {
 };
 
 const compColors = {};
+let _kwByUrl      = {};
 let currentSheet  = 'pages_all';
 let currentData   = [];
 let filteredData  = [];
@@ -646,6 +664,11 @@ function renderTable(data, type) {
   const start = (currentPage - 1) * PAGE_SIZE;
   const page  = data.slice(start, start + PAGE_SIZE);
 
+  if (type === 'pages_keys') {
+    renderPagesWithKeys(data);
+    return;
+  }
+
   if (type === 'pages' || type === 'pages_new') {
     const cols = type === 'pages_new'
       ? [['competitor','Конкурент'],['url','URL'],['page_type','Тип'],['traffic','Трафік'],['keywords_n','Ключів']]
@@ -706,6 +729,149 @@ function renderPagination(total) {
 function goPage(p) {
   currentPage = p;
   renderTable(filteredData, SHEETS[currentSheet].type);
+}
+
+// ── PAGES + KEYWORDS VIEW ─────────────────────────────────────────────────────
+
+async function loadPagesWithKeys() {
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = '<div class="loading"><div class="spinner"></div> Завантажуємо сторінки та ключові слова...</div>';
+  document.getElementById('pagination').innerHTML = '';
+  document.getElementById('tableTitle').textContent = SHEETS[currentSheet].title;
+  document.getElementById('tableCount').textContent = '';
+
+  document.getElementById('catLabel').style.display        = 'none';
+  document.getElementById('catFilter').style.display       = 'none';
+  document.getElementById('ptLabel').style.display         = '';
+  document.getElementById('pageTypeFilter').style.display  = '';
+
+  try {
+    const [pagesData, kwData] = await Promise.all([
+      fetchCSV('pages_all'),
+      fetchCSV('keywords_all')
+    ]);
+
+    _kwByUrl = {};
+    kwData.forEach(row => {
+      const url = (row.url || '').trim();
+      if (url) {
+        if (!_kwByUrl[url]) _kwByUrl[url] = [];
+        _kwByUrl[url].push(row);
+      }
+    });
+    Object.values(_kwByUrl).forEach(arr =>
+      arr.sort((a, b) => (parseInt(b.traffic) || 0) - (parseInt(a.traffic) || 0))
+    );
+
+    currentData = pagesData;
+    updateCompFilter(pagesData);
+    updatePageTypeFilter(pagesData);
+    applyFilters();
+  } catch(e) {
+    tbody.innerHTML = `<div class="error-msg">⚠ Не вдалося завантажити дані<br><small style="color:var(--muted)">${e.message}</small></div>`;
+  }
+}
+
+function renderPagesWithKeys(data) {
+  const tbody = document.getElementById('tableBody');
+  if (!data.length) {
+    tbody.innerHTML = '<div class="empty" style="padding:40px;text-align:center;color:var(--muted);font-size:12px">Дані відсутні або не збігаються з фільтром</div>';
+    renderPagination(0);
+    return;
+  }
+
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const page  = data.slice(start, start + PAGE_SIZE);
+
+  const thSort = (col, label) => {
+    const active = sortCol === col;
+    const arrow  = active ? (sortDir > 0 ? ' ↑' : ' ↓') : '';
+    return `<th onclick="sortBy('${col}')" class="${active ? 'sorted' : ''}">${label}${arrow}</th>`;
+  };
+
+  let html = `<table>
+    <thead><tr>
+      <th style="width:28px;cursor:default"></th>
+      ${thSort('competitor', 'Конкурент')}
+      ${thSort('url', 'URL')}
+      ${thSort('page_type', 'Тип')}
+      ${thSort('traffic', 'Трафік')}
+      ${thSort('keywords_n', 'Ключів')}
+      ${thSort('wow_pct', 'WoW %')}
+    </tr></thead>
+    <tbody>`;
+
+  page.forEach((row, idx) => {
+    const url     = (row.url || '').trim();
+    const kws     = _kwByUrl[url] || [];
+    const rowId   = `pk-${start + idx}`;
+    const fullUrl = url.startsWith('http') ? url : 'https://' + url;
+
+    html += `<tr class="pk-page-row" id="${rowId}-page" onclick="togglePKRow('${rowId}')">
+      <td><span class="pk-toggle" id="${rowId}-tog">▶</span></td>
+      <td><span class="comp-badge badge-${getCompColor(row.competitor)}">${row.competitor || '—'}</span></td>
+      <td class="url-cell">
+        <a href="${fullUrl}" target="_blank" onclick="event.stopPropagation()">${url || '—'}</a>
+        ${row.is_new === 'True' ? '<span class="tag-new">NEW</span>' : ''}
+      </td>
+      <td>${fmtPageType(row.page_type)}</td>
+      <td class="num">${fmtNum(row.traffic)}</td>
+      <td class="num">${kws.length || row.keywords_n || '—'}</td>
+      <td class="num">${fmtWow(row.wow_pct)}</td>
+    </tr>`;
+
+    html += `<tr class="pk-kw-row" id="${rowId}-kw" style="display:none"><td colspan="7">`;
+
+    if (!kws.length) {
+      html += `<div class="pk-empty-kw">Ключових слів для цієї сторінки у вибірці немає</div>`;
+    } else {
+      const show = kws.slice(0, 25);
+      html += `<div class="pk-kw-inner">
+        <table>
+          <thead><tr>
+            <th>Ключ</th>
+            <th>Кат.</th>
+            <th>Поз.</th>
+            <th>Об'єм</th>
+            <th>Трафік</th>
+            <th>WoW %</th>
+          </tr></thead>
+          <tbody>${show.map(kw => `<tr>
+            <td style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(kw.keyword || '').replace(/"/g, '&quot;')}">
+              <a href="https://www.google.com/search?q=${encodeURIComponent(kw.keyword || '')}" target="_blank"
+                 style="color:var(--text);text-decoration:none">${kw.keyword || '—'}</a>
+            </td>
+            <td>${fmtCat(kw.category)}</td>
+            <td class="num">${kw.position || '—'}</td>
+            <td class="num">${fmtNum(kw.volume)}</td>
+            <td class="num">${fmtNum(kw.traffic)}</td>
+            <td class="num">${fmtWow(kw.wow_pct)}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+        ${kws.length > 25 ? `<div class="pk-kw-more">+ ще ${kws.length - 25} ключів</div>` : ''}
+      </div>`;
+    }
+
+    html += `</td></tr>`;
+  });
+
+  html += `</tbody></table>`;
+  tbody.innerHTML = html;
+  renderPagination(data.length);
+}
+
+function togglePKRow(rowId) {
+  const kwRow = document.getElementById(`${rowId}-kw`);
+  const tog   = document.getElementById(`${rowId}-tog`);
+  const pgRow = document.getElementById(`${rowId}-page`);
+  if (!kwRow) return;
+  const isOpen = kwRow.style.display !== 'none';
+  kwRow.style.display = isOpen ? 'none' : '';
+  if (tog) {
+    tog.style.transform = isOpen ? '' : 'rotate(90deg)';
+    tog.style.color     = isOpen ? '' : 'var(--accent)';
+  }
+  if (pgRow) pgRow.classList.toggle('open', !isOpen);
 }
 
 function sortBy(col) {
@@ -845,6 +1011,10 @@ async function switchTab(sheet, btn) {
   document.getElementById('searchInput').value = '';
   document.getElementById('pageTypeFilter').value = '';
   document.getElementById('catFilter').value = '';
+  if (SHEETS[sheet].type === 'pages_keys') {
+    await loadPagesWithKeys();
+    return;
+  }
   await loadSheet(sheet);
 }
 
