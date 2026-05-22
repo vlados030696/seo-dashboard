@@ -763,9 +763,25 @@ async function loadPagesWithKeys() {
       arr.sort((a, b) => (parseInt(b.traffic) || 0) - (parseInt(a.traffic) || 0))
     );
 
-    currentData = pagesData;
-    updateCompFilter(pagesData);
-    updatePageTypeFilter(pagesData);
+    // Only keep pages with 3+ keywords in the index
+    const filteredPages = pagesData.filter(row => {
+      const url   = (row.url || '').trim();
+      const kwCnt = (_kwByUrl[url] || []).length;
+      return kwCnt >= 3 || (parseInt(row.keywords_n) || 0) >= 3;
+    });
+
+    currentData = filteredPages;
+    // Default sort: traffic descending
+    if (!sortCol) { sortCol = 'traffic'; sortDir = -1; }
+    currentData.sort((a, b) => {
+      const av = parseFloat(a[sortCol]) || 0;
+      const bv = parseFloat(b[sortCol]) || 0;
+      if (av < bv) return -sortDir;
+      if (av > bv) return sortDir;
+      return 0;
+    });
+    updateCompFilter(filteredPages);
+    updatePageTypeFilter(filteredPages);
     applyFilters();
   } catch(e) {
     tbody.innerHTML = `<div class="error-msg">⚠ Не вдалося завантажити дані<br><small style="color:var(--muted)">${e.message}</small></div>`;
@@ -789,9 +805,18 @@ function renderPagesWithKeys(data) {
     return `<th onclick="sortBy('${col}')" class="${active ? 'sorted' : ''}">${label}${arrow}</th>`;
   };
 
-  let html = `<table>
+  let html = `<table style="table-layout:fixed;width:100%">
+    <colgroup>
+      <col style="width:32px">
+      <col style="width:130px">
+      <col style="width:auto">
+      <col style="width:110px">
+      <col style="width:100px">
+      <col style="width:80px">
+      <col style="width:90px">
+    </colgroup>
     <thead><tr>
-      <th style="width:28px;cursor:default"></th>
+      <th style="cursor:default"></th>
       ${thSort('competitor', 'Конкурент')}
       ${thSort('url', 'URL')}
       ${thSort('page_type', 'Тип')}
@@ -935,7 +960,7 @@ function applyFilters() {
 }
 
 function updatePageTypeFilter(data) {
-  const types = [...new Set(data.map(r => r.page_type).filter(Boolean))].sort();
+  const types = [...new Set(data.map(r => r.page_type).filter(v => v && v !== 'None'))].sort();
   const sel = document.getElementById('pageTypeFilter');
   const cur = sel.value;
   sel.innerHTML = '<option value="">Всі типи</option>' +
@@ -1757,9 +1782,15 @@ function buildTrendsUI() {
           ← Всі категорії
         </button>
         <span class="filter-label">Від:</span>
-        <input type="date" class="filter-select" id="trendFrom" value="${minD}" onchange="onTrendFilterChange()">
+        <input type="date" class="filter-select" id="trendFrom" value="${minD}">
         <span class="filter-label">До:</span>
-        <input type="date" class="filter-select" id="trendTo"   value="${maxD}" onchange="onTrendFilterChange()">
+        <input type="date" class="filter-select" id="trendTo"   value="${maxD}">
+        <button onclick="onTrendFilterChange()"
+          style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);
+                 background:var(--surface2);color:var(--accent);font-family:'JetBrains Mono',monospace;
+                 font-size:11px;cursor:pointer;transition:all .2s"
+          onmouseover="this.style.borderColor='var(--accent)'"
+          onmouseout="this.style.borderColor='var(--border)'">↺ Оновити</button>
         <span class="filter-label">Категорія:</span>
         <select class="filter-select" id="trendCat" onchange="onTrendCatChange()">
           <option value="">Всі категорії</option>
@@ -1826,6 +1857,8 @@ function buildTrendsUI() {
 function onTrendFilterChange() {
   buildTrendsChart();
   buildTrendsTable();
+  buildCatGrid();
+  buildTrendsOverview();
 }
 
 function onTrendCatChange() {
