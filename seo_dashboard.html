@@ -635,6 +635,23 @@ function fmtWow(v) {
   return `<span class="${cls}">${sign}${n.toFixed(1)}%</span>`;
 }
 
+function fmtWowFull(pct, delta) {
+  if (pct === '' || pct === 'None' || pct === undefined) return '<span style="color:var(--muted)">—</span>';
+  const n = parseFloat(pct);
+  if (isNaN(n)) return '<span style="color:var(--muted)">—</span>';
+  const cls  = n > 0 ? 'wow-pos' : n < 0 ? 'wow-neg' : '';
+  const sign = n > 0 ? '+' : '';
+  const pctHtml = `<span class="${cls}">${sign}${n.toFixed(1)}%</span>`;
+  const d = parseInt(delta);
+  if (delta !== undefined && delta !== '' && delta !== 'None' && !isNaN(d) && d !== 0) {
+    const dSign = d > 0 ? '+' : '-';
+    const dAbs  = Math.abs(d);
+    const dFmt  = dAbs >= 1000000 ? (dAbs/1000000).toFixed(1)+'M' : dAbs >= 1000 ? (dAbs/1000).toFixed(0)+'K' : dAbs.toLocaleString();
+    return pctHtml + `<span style="font-size:10px;color:var(--muted);margin-left:3px">(${dSign}${dFmt})</span>`;
+  }
+  return pctHtml;
+}
+
 function fmtPageType(v) {
   if (!v || v === 'None') return '<span style="color:var(--muted)">—</span>';
   return `<span class="pt-badge pt-${v}">${v}</span>`;
@@ -678,7 +695,7 @@ function renderTable(data, type) {
         <td>${fmtPageType(row.page_type)}</td>
         <td class="num">${fmtNum(row.traffic)}</td>
         <td class="num">${row.keywords_n||'—'}</td>
-        ${type==='pages'?`<td class="num">${fmtWow(row.wow_pct)}</td>`:''}
+        ${type==='pages'?`<td class="num">${fmtWowFull(row.wow_pct, row.wow_delta)}</td>`:''}
       </tr>`).join('')}</tbody>
     </table>`;
   } else {
@@ -835,7 +852,7 @@ function renderPagesWithKeys(data) {
       <td>${fmtPageType(row.page_type)}</td>
       <td class="num">${fmtNum(row.traffic)}</td>
       <td class="num">${kws.length || '—'}</td>
-      <td class="num">${fmtWow(row.wow_pct)}</td>
+      <td class="num">${fmtWowFull(row.wow_pct, row.wow_delta)}</td>
     </tr>`;
 
     html += `<tr class="pk-kw-row" id="${rowId}-kw" style="display:none"><td colspan="7">`;
@@ -1679,6 +1696,15 @@ async function init() {
   try {
     const ka = await fetchCSV('keywords_all');
     document.getElementById('stat-keys').textContent = fmtNum(ka.length);
+  } catch(e) {}
+  // Реальна кількість сторінок з _meta (якщо є — точніше ніж pages_all)
+  try {
+    const meta = await fetchCSV('_meta');
+    if (meta.length >= 1) {
+      const row = meta[0];
+      const total = parseInt(row.total_pages);
+      if (total > 0) document.getElementById('stat-pages').textContent = fmtNum(total);
+    }
   } catch(e) {}
 }
 
