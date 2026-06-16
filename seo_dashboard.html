@@ -757,11 +757,10 @@ async function loadPagesWithKeys() {
       arr.sort((a, b) => (parseInt(b.traffic) || 0) - (parseInt(a.traffic) || 0))
     );
 
-    // Only keep pages with 3+ keywords in the index
+    // Тільки сторінки, для яких є реальні ключі в keywords_all
     const filteredPages = pagesData.filter(row => {
-      const url   = (row.url || '').trim();
-      const kwCnt = (_kwByUrl[url] || []).length;
-      return kwCnt >= 3 || (parseInt(row.keywords_n) || 0) >= 3;
+      const url = (row.url || '').trim();
+      return (_kwByUrl[url] || []).length > 0;
     });
 
     currentData = filteredPages;
@@ -835,7 +834,7 @@ function renderPagesWithKeys(data) {
       </td>
       <td>${fmtPageType(row.page_type)}</td>
       <td class="num">${fmtNum(row.traffic)}</td>
-      <td class="num">${kws.length || row.keywords_n || '—'}</td>
+      <td class="num">${kws.length || '—'}</td>
       <td class="num">${fmtWow(row.wow_pct)}</td>
     </tr>`;
 
