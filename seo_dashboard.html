@@ -507,9 +507,6 @@ td {
         <button class="tab active" onclick="switchTab('pages_all', this)">Всі сторінки</button>
         <button class="tab" onclick="switchTab('pages_with_keys', this)">Сторінки + Ключі</button>
         <button class="tab" onclick="switchTab('pages_new', this)">Нові сторінки</button>
-        <button class="tab" onclick="switchTab('pages_type_summary', this)">Типи сторінок</button>
-        <button class="tab" onclick="switchTab('keywords_all', this)">Ключові слова</button>
-        <button class="tab" onclick="switchTab('keywords_top_volume', this)">Топ за об'ємом</button>
         <button class="tab" onclick="showRozetka(this)">Категорії Rozetka</button>
         <button class="tab" onclick="showCharts(this)">Графіки</button>
       </div>
@@ -566,12 +563,9 @@ td {
 <script>
 const SHEET_ID = '1COlbKcnpKLiqc9mJkfjv_wEOTGvDaDq9gtdbS55m0gM';
 const SHEETS = {
-  pages_all:           { title: 'Всі сторінки конкурентів', type: 'pages' },
-  pages_with_keys:     { title: 'Сторінки з ключовими словами', type: 'pages_keys' },
-  pages_new:           { title: 'Нові сторінки', type: 'pages_new' },
-  pages_type_summary:  { title: 'Зведення по типах сторінок', type: 'summary' },
-  keywords_all:        { title: 'Всі ключові слова', type: 'keywords' },
-  keywords_top_volume: { title: 'Топ ключів за об\'ємом пошуку', type: 'keywords' },
+  pages_all:       { title: 'Всі сторінки конкурентів', type: 'pages' },
+  pages_with_keys: { title: 'Сторінки з ключовими словами', type: 'pages_keys' },
+  pages_new:       { title: 'Нові сторінки', type: 'pages_new' },
 };
 
 const compColors = {};
@@ -1966,8 +1960,11 @@ async function buildRelatedPanel(kw) {
 
   const chipRising = q => {
     const isBreakout = String(q.value).toLowerCase().includes('breakout');
+    const _rval = parseInt(q.value) || 0;
     const badge = isBreakout
       ? `<span style="font-size:9px;background:rgba(0,229,160,.15);color:var(--accent);border:1px solid rgba(0,229,160,.3);border-radius:3px;padding:1px 6px;white-space:nowrap">🔥 Breakout</span>`
+      : _rval > 500
+      ? `<span style="font-size:9px;background:rgba(253,161,16,.15);color:var(--accent);border:1px solid rgba(253,161,16,.3);border-radius:3px;padding:1px 6px;white-space:nowrap">Гіперпопулярність</span>`
       : `<span style="font-size:11px;color:var(--accent);font-variant-numeric:tabular-nums">+${q.value}%</span>`;
     return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid rgba(42,42,56,.4)">
       <span style="flex:1;font-size:12px;color:var(--text)">${q.related_query}</span>
@@ -2471,6 +2468,8 @@ function _renderRisingRelTable() {
         const idx   = start + i + 1;
         const badge = r.isBreakout
           ? `<span style="font-size:9px;background:rgba(0,229,160,.15);color:var(--accent);border:1px solid rgba(0,229,160,.3);border-radius:3px;padding:1px 6px;white-space:nowrap">🔥 Breakout</span>`
+          : r.sortVal > 500
+          ? `<span style="font-size:9px;background:rgba(253,161,16,.15);color:var(--accent);border:1px solid rgba(253,161,16,.3);border-radius:3px;padding:1px 6px;white-space:nowrap">Гіперпопулярність</span>`
           : `<span style="color:var(--accent);font-variant-numeric:tabular-nums;font-size:12px">+${r.value}%</span>`;
         return `<tr>
           <td style="color:var(--muted);font-size:11px">${idx}</td>
