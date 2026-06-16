@@ -486,7 +486,7 @@ td {
     <div class="stat-card new-c">
       <div class="stat-label">Нові сторінки</div>
       <div class="stat-val" id="stat-new" style="color:var(--new)">—</div>
-      <div class="stat-sub">за останній місяць</div>
+      <div class="stat-sub">за останній тиждень</div>
     </div>
     <div class="stat-card keys">
       <div class="stat-label">Ключових слів</div>
@@ -683,7 +683,7 @@ function renderTable(data, type) {
   if (type === 'pages' || type === 'pages_new') {
     const cols = type === 'pages_new'
       ? [['competitor','Конкурент'],['url','URL'],['page_type','Тип'],['traffic','Трафік'],['keywords_n','Ключів']]
-      : [['competitor','Конкурент'],['url','URL'],['page_type','Тип'],['traffic','Трафік'],['keywords_n','Ключів'],['wow_pct','MoM %']];
+      : [['competitor','Конкурент'],['url','URL'],['page_type','Тип'],['traffic','Трафік'],['keywords_n','Ключів'],['wow_pct','WoW %']];
 
     tbody.innerHTML = `<table>
       <thead><tr>${cols.map(([k,l]) =>
@@ -701,7 +701,7 @@ function renderTable(data, type) {
   } else {
     const cols = [
       ['competitor','Конкурент'],['keyword','Ключ'],['category','Кат.'],
-      ['position','Поз.'],['volume','Об\'єм'],['traffic','Трафік'],['wow_pct','MoM %']
+      ['position','Поз.'],['volume','Об\'єм'],['traffic','Трафік'],['wow_pct','WoW %']
     ];
     tbody.innerHTML = `<table>
       <thead><tr>${cols.map(([k,l]) =>
@@ -820,10 +820,10 @@ function renderPagesWithKeys(data) {
       <col style="width:32px">
       <col style="width:130px">
       <col style="width:auto">
-      <col style="width:110px">
       <col style="width:100px">
-      <col style="width:80px">
       <col style="width:90px">
+      <col style="width:60px">
+      <col style="width:130px">
     </colgroup>
     <thead><tr>
       <th style="cursor:default"></th>
@@ -832,7 +832,7 @@ function renderPagesWithKeys(data) {
       ${thSort('page_type', 'Тип')}
       ${thSort('traffic', 'Трафік')}
       ${thSort('keywords_n', 'Ключів')}
-      ${thSort('wow_pct', 'MoM %')}
+      ${thSort('wow_pct', 'WoW %')}
     </tr></thead>
     <tbody>`;
 
@@ -861,6 +861,7 @@ function renderPagesWithKeys(data) {
       html += `<div class="pk-empty-kw">Ключових слів для цієї сторінки у вибірці немає</div>`;
     } else {
       const show = kws.slice(0, 25);
+      const pageTraffic = parseInt(row.traffic) || 1;
       html += `<div class="pk-kw-inner">
         <table>
           <thead><tr>
@@ -869,10 +870,23 @@ function renderPagesWithKeys(data) {
             <th>Поз.</th>
             <th>Об'єм</th>
             <th>Трафік</th>
-            <th>MoM %</th>
+            <th style="color:var(--accent2)">% сторінки</th>
+            <th>WoW %</th>
           </tr></thead>
-          <tbody>${show.map(kw => `<tr>
-            <td style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(kw.keyword || '').replace(/"/g, '&quot;')}">
+          <tbody>${show.map(kw => {
+            const kwT  = parseInt(kw.traffic) || 0;
+            const pct  = Math.round(kwT / pageTraffic * 100);
+            const pctW = Math.min(pct, 100);
+            const pctCell = kwT > 0
+              ? `<div style="display:flex;align-items:center;gap:5px;justify-content:flex-end">
+                  <div style="width:36px;height:3px;background:var(--border);border-radius:2px;overflow:hidden;flex-shrink:0">
+                    <div style="width:${pctW}%;height:100%;background:var(--accent2);border-radius:2px"></div>
+                  </div>
+                  <span style="color:var(--accent2);font-size:10px;min-width:28px;text-align:right">${pct}%</span>
+                </div>`
+              : '<span style="color:var(--muted)">—</span>';
+            return `<tr>
+            <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(kw.keyword || '').replace(/"/g, '&quot;')}">
               <a href="https://www.google.com/search?q=${encodeURIComponent(kw.keyword || '')}" target="_blank"
                  style="color:var(--text);text-decoration:none">${kw.keyword || '—'}</a>
             </td>
@@ -880,8 +894,9 @@ function renderPagesWithKeys(data) {
             <td class="num">${kw.position || '—'}</td>
             <td class="num">${fmtNum(kw.volume)}</td>
             <td class="num">${fmtNum(kw.traffic)}</td>
+            <td class="num">${pctCell}</td>
             <td class="num">${fmtWow(kw.wow_pct)}</td>
-          </tr>`).join('')}</tbody>
+          </tr>`;}).join('')}</tbody>
         </table>
         ${kws.length > 25 ? `<div class="pk-kw-more">+ ще ${kws.length - 25} ключів</div>` : ''}
       </div>`;
