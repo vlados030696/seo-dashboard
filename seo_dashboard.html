@@ -486,7 +486,7 @@ td {
     <div class="stat-card new-c">
       <div class="stat-label">Нові сторінки</div>
       <div class="stat-val" id="stat-new" style="color:var(--new)">—</div>
-      <div class="stat-sub">за останній тиждень</div>
+      <div class="stat-sub">за останній місяць</div>
     </div>
     <div class="stat-card keys">
       <div class="stat-label">Ключових слів</div>
@@ -683,7 +683,7 @@ function renderTable(data, type) {
   if (type === 'pages' || type === 'pages_new') {
     const cols = type === 'pages_new'
       ? [['competitor','Конкурент'],['url','URL'],['page_type','Тип'],['traffic','Трафік'],['keywords_n','Ключів']]
-      : [['competitor','Конкурент'],['url','URL'],['page_type','Тип'],['traffic','Трафік'],['keywords_n','Ключів'],['wow_pct','WoW %']];
+      : [['competitor','Конкурент'],['url','URL'],['page_type','Тип'],['traffic','Трафік'],['keywords_n','Ключів'],['wow_pct','MoM %']];
 
     tbody.innerHTML = `<table>
       <thead><tr>${cols.map(([k,l]) =>
@@ -701,7 +701,7 @@ function renderTable(data, type) {
   } else {
     const cols = [
       ['competitor','Конкурент'],['keyword','Ключ'],['category','Кат.'],
-      ['position','Поз.'],['volume','Об\'єм'],['traffic','Трафік'],['wow_pct','WoW %']
+      ['position','Поз.'],['volume','Об\'єм'],['traffic','Трафік'],['wow_pct','MoM %']
     ];
     tbody.innerHTML = `<table>
       <thead><tr>${cols.map(([k,l]) =>
@@ -832,7 +832,7 @@ function renderPagesWithKeys(data) {
       ${thSort('page_type', 'Тип')}
       ${thSort('traffic', 'Трафік')}
       ${thSort('keywords_n', 'Ключів')}
-      ${thSort('wow_pct', 'WoW %')}
+      ${thSort('wow_pct', 'MoM %')}
     </tr></thead>
     <tbody>`;
 
@@ -869,7 +869,7 @@ function renderPagesWithKeys(data) {
             <th>Поз.</th>
             <th>Об'єм</th>
             <th>Трафік</th>
-            <th>WoW %</th>
+            <th>MoM %</th>
           </tr></thead>
           <tbody>${show.map(kw => `<tr>
             <td style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(kw.keyword || '').replace(/"/g, '&quot;')}">
