@@ -501,12 +501,24 @@ td {
   </div>
 
   <div class="navbars">
+    <div class="navbar-row" id="periodBar" style="display:none">
+      <span class="navbar-label">Зріз:</span>
+      <select class="filter-select" id="periodSelect" onchange="onPeriodChange()" style="min-width:120px">
+        <option value="">Поточний</option>
+      </select>
+      <span class="filter-label" id="periodVsLabel" style="display:none">vs</span>
+      <select class="filter-select" id="periodCompare" onchange="onPeriodChange()" style="min-width:120px;display:none">
+        <option value="">Не порівнювати</option>
+      </select>
+      <span id="periodInfo" style="font-size:11px;color:var(--muted);margin-left:4px"></span>
+    </div>
     <div class="navbar-row">
       <span class="navbar-label">Конкуренти</span>
       <div class="tabs">
         <button class="tab active" onclick="switchTab('pages_all', this)">Всі сторінки</button>
         <button class="tab" onclick="switchTab('pages_with_keys', this)">Сторінки + Ключі</button>
         <button class="tab" onclick="switchTab('pages_new', this)">Нові сторінки</button>
+        <button class="tab" onclick="switchTab('keywords_new', this)">Нові ключі</button>
         <button class="tab" onclick="showRozetka(this)">Категорії Rozetka</button>
         <button class="tab" onclick="showCharts(this)">Графіки</button>
       </div>
@@ -566,7 +578,89 @@ const SHEETS = {
   pages_all:       { title: 'Всі сторінки конкурентів', type: 'pages' },
   pages_with_keys: { title: 'Сторінки з ключовими словами', type: 'pages_keys' },
   pages_new:       { title: 'Нові сторінки', type: 'pages_new' },
+  keywords_new:    { title: 'Нові ключові слова конкурентів', type: 'keywords' },
 };
+
+// ── PERIOD (MONTHLY SNAPSHOT) STATE ──────────────────────────────────────────
+let _selectedPeriod = '';   // '' = current (pages_all), '2026_06' = archive
+let _comparePeriod  = '';   // '' = no comparison
+let _monthsData     = [];   // [{month_key, date, pages_count}]
+
+function _sheetName(base, period) {
+  if (!period) return base;
+  // base: 'pages_all' → 'pages_2026_06'; 'keywords_all' → 'keywords_2026_06'
+  const prefix = base.startsWith('keywords') ? 'keywords' : 'pages';
+  return `${prefix}_${period}`;
+}
+
+async function loadMonths() {
+  try {
+    const rows = await fetchCSV('_months');
+    _monthsData = rows.filter(r => r.month_key);
+    if (!_monthsData.length) return;
+
+    const sel  = document.getElementById('periodSelect');
+    const sel2 = document.getElementById('periodCompare');
+    const bar  = document.getElementById('periodBar');
+
+    _monthsData.sort((a,b) => b.month_key.localeCompare(a.month_key));
+    const opts = _monthsData.map(r => {
+      const label = r.date ? r.date.slice(0,7) : r.month_key.replace('_','-');
+      return `<option value="${r.month_key}">${label}</option>`;
+    }).join('');
+    sel.innerHTML  = `<option value="">Поточний</option>${opts}`;
+    sel2.innerHTML = `<option value="">Не порівнювати</option>${opts}`;
+    bar.style.display = '';
+  } catch(e) {}
+}
+
+async function onPeriodChange() {
+  _selectedPeriod = document.getElementById('periodSelect').value;
+  _comparePeriod  = document.getElementById('periodCompare').value;
+
+  const vsLabel = document.getElementById('periodVsLabel');
+  const cmpSel  = document.getElementById('periodCompare');
+  vsLabel.style.display = _selectedPeriod ? '' : 'none';
+  cmpSel.style.display  = _selectedPeriod ? '' : 'none';
+
+  const info = document.getElementById('periodInfo');
+  if (_selectedPeriod) {
+    const m = _monthsData.find(r => r.month_key === _selectedPeriod);
+    info.textContent = m?.date ? `Зріз: ${m.date}` : '';
+  } else {
+    info.textContent = '';
+  }
+
+  // Reload current tab with new period
+  if (currentSheet && SHEETS[currentSheet]) {
+    await switchTabByName(currentSheet);
+  }
+}
+
+async function fetchPeriodCSV(base, period) {
+  return fetchCSV(_sheetName(base, period));
+}
+
+// Порівняльна таблиця двох місяців
+async function loadComparisonData(base) {
+  const [curr, prev] = await Promise.all([
+    fetchPeriodCSV(base, _selectedPeriod),
+    fetchPeriodCSV(base, _comparePeriod),
+  ]);
+  const keyField = base.startsWith('keywords') ? 'keyword' : 'url';
+  const prevMap = {};
+  prev.forEach(r => { prevMap[`${r.competitor}||${r[keyField]}`] = r; });
+
+  return curr.map(row => {
+    const key = `${row.competitor}||${row[keyField]}`;
+    const p   = prevMap[key];
+    const cT  = parseInt(row.traffic)   || 0;
+    const pT  = p ? (parseInt(p.traffic) || 0) : 0;
+    const delta = cT - pT;
+    const pct   = pT > 0 ? Math.round(delta / pT * 100) : null;
+    return { ...row, traffic_prev: pT, wow_delta: delta, wow_pct: pct };
+  });
+}
 
 const compColors = {};
 let _kwByUrl      = {};
@@ -774,13 +868,8 @@ async function loadPagesWithKeys() {
       arr.sort((a, b) => (parseInt(b.traffic) || 0) - (parseInt(a.traffic) || 0))
     );
 
-    // Тільки сторінки, для яких є реальні ключі в keywords_all
-    const filteredPages = pagesData.filter(row => {
-      const url = (row.url || '').trim();
-      return (_kwByUrl[url] || []).length > 0;
-    });
-
-    currentData = filteredPages;
+    // Показуємо всі сторінки; ключі розгортаються тільки там де є дані
+    currentData = pagesData;
     // Default sort: traffic descending
     if (!sortCol) { sortCol = 'traffic'; sortDir = -1; }
     currentData.sort((a, b) => {
@@ -790,8 +879,8 @@ async function loadPagesWithKeys() {
       if (av > bv) return sortDir;
       return 0;
     });
-    updateCompFilter(filteredPages);
-    updatePageTypeFilter(filteredPages);
+    updateCompFilter(pagesData);
+    updatePageTypeFilter(pagesData);
     applyFilters();
   } catch(e) {
     tbody.innerHTML = `<div class="error-msg">⚠ Не вдалося завантажити дані<br><small style="color:var(--muted)">${e.message}</small></div>`;
@@ -839,11 +928,12 @@ function renderPagesWithKeys(data) {
   page.forEach((row, idx) => {
     const url     = (row.url || '').trim();
     const kws     = _kwByUrl[url] || [];
+    const hasKws  = kws.length > 0;
     const rowId   = `pk-${start + idx}`;
     const fullUrl = url.startsWith('http') ? url : 'https://' + url;
 
-    html += `<tr class="pk-page-row" id="${rowId}-page" onclick="togglePKRow('${rowId}')">
-      <td><span class="pk-toggle" id="${rowId}-tog">▶</span></td>
+    html += `<tr class="${hasKws ? 'pk-page-row' : ''}" id="${rowId}-page" ${hasKws ? `onclick="togglePKRow('${rowId}')"` : ''}>
+      <td>${hasKws ? `<span class="pk-toggle" id="${rowId}-tog">▶</span>` : ''}</td>
       <td><span class="comp-badge badge-${getCompColor(row.competitor)}">${row.competitor || '—'}</span></td>
       <td class="url-cell">
         <a href="${fullUrl}" target="_blank" onclick="event.stopPropagation()">${url || '—'}</a>
@@ -851,15 +941,15 @@ function renderPagesWithKeys(data) {
       </td>
       <td>${fmtPageType(row.page_type)}</td>
       <td class="num">${fmtNum(row.traffic)}</td>
-      <td class="num">${kws.length || '—'}</td>
+      <td class="num">${hasKws ? kws.length : '<span style="color:var(--muted)">—</span>'}</td>
       <td class="num">${fmtWowFull(row.wow_pct, row.wow_delta)}</td>
     </tr>`;
 
+    if (!hasKws) return;
+
     html += `<tr class="pk-kw-row" id="${rowId}-kw" style="display:none"><td colspan="7">`;
 
-    if (!kws.length) {
-      html += `<div class="pk-empty-kw">Ключових слів для цієї сторінки у вибірці немає</div>`;
-    } else {
+    {
       const show = kws.slice(0, 25);
       const pageTraffic = parseInt(row.traffic) || 1;
       html += `<div class="pk-kw-inner">
@@ -1013,14 +1103,28 @@ async function loadSheet(sheet) {
   document.getElementById('ptLabel').style.display     = isPages ? '' : 'none';
   document.getElementById('pageTypeFilter').style.display = isPages ? '' : 'none';
 
+  // Determine which base sheet name maps to period archives
+  const periodBase = (sheet === 'pages_all' || sheet === 'pages_new' || sheet === 'keywords_new')
+    ? sheet
+    : sheet;  // keywords_new / pages_new stay as-is (no period archive)
+
   try {
-    currentData = await fetchCSV(sheet);
+    // Comparison mode: two periods selected and this is a period-aware tab
+    const hasPeriodArchive = (sheet === 'pages_all');
+    if (hasPeriodArchive && _selectedPeriod && _comparePeriod) {
+      currentData = await loadComparisonData('pages');
+    } else if (hasPeriodArchive && _selectedPeriod) {
+      currentData = await fetchCSV(_sheetName(sheet, _selectedPeriod));
+    } else {
+      currentData = await fetchCSV(sheet);
+    }
+
     updateCompFilter(currentData);
     if (isPages) updatePageTypeFilter(currentData);
     applyFilters();
 
-    // update stats on first load
-    if (sheet === 'pages_all') {
+    // update stats on first load of current snapshot
+    if (sheet === 'pages_all' && !_selectedPeriod) {
       document.getElementById('stat-pages').textContent = fmtNum(currentData.length);
       const comps = new Set(currentData.map(r => r.competitor).filter(Boolean));
       document.getElementById('stat-comps').textContent = comps.size;
@@ -1050,6 +1154,10 @@ async function loadSheet(sheet) {
 async function switchTab(sheet, btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
+  await switchTabByName(sheet);
+}
+
+async function switchTabByName(sheet) {
   document.getElementById('chartsPanel').style.display  = 'none';
   document.getElementById('rozetkaPanel').style.display = 'none';
   document.getElementById('trendsPanel').style.display  = 'none';
@@ -1712,7 +1820,7 @@ async function init() {
     const ka = await fetchCSV('keywords_all');
     document.getElementById('stat-keys').textContent = fmtNum(ka.length);
   } catch(e) {}
-  // Реальна кількість сторінок з _meta (якщо є — точніше ніж pages_all)
+  // Реальна кількість сторінок з _meta
   try {
     const meta = await fetchCSV('_meta');
     if (meta.length >= 1) {
@@ -1721,6 +1829,8 @@ async function init() {
       if (total > 0) document.getElementById('stat-pages').textContent = fmtNum(total);
     }
   } catch(e) {}
+  // Місячні зрізи для period filter
+  await loadMonths();
 }
 
 init();
@@ -1855,6 +1965,7 @@ function buildTrendsUI() {
           <span class="table-title" id="trendsChartTitle">Динаміка Google Trends (тижнева)</span>
           <span class="table-count" id="trendsChartInfo"></span>
         </div>
+        <div id="trendsPeriodBadge" style="padding:4px 20px 0;font-size:10px;color:var(--muted)"></div>
         <div style="padding:20px;position:relative;height:420px">
           <canvas id="chTrends"></canvas>
         </div>
@@ -2149,6 +2260,12 @@ function buildTrendsChart() {
 
   const infoEl = document.getElementById('trendsChartInfo');
   if (infoEl) infoEl.textContent = `${topKws.length} ключів · ${weeks.length} тижнів`;
+
+  const periodEl = document.getElementById('trendsPeriodBadge');
+  if (periodEl && weeks.length) {
+    const fmt = d => d ? d.slice(0,7).replace('-','.') : '?';
+    periodEl.textContent = `Період: ${fmt(weeks[0])} — ${fmt(weeks[weeks.length-1])}`;
+  }
 }
 
 window.toggleTrendKw = (idx, btn) => {
