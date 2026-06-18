@@ -1962,7 +1962,7 @@ function buildTrendsUI() {
       <!-- Графік -->
       <div class="table-wrap" style="margin-bottom:12px">
         <div class="table-header">
-          <span class="table-title" id="trendsChartTitle">Динаміка Google Trends (тижнева)</span>
+          <span class="table-title" id="trendsChartTitle">Динаміка Google Trends (зрізи)</span>
           <span class="table-count" id="trendsChartInfo"></span>
         </div>
         <div id="trendsPeriodBadge" style="padding:4px 20px 0;font-size:10px;color:var(--muted)"></div>
@@ -2036,6 +2036,18 @@ function _initTrendMonthSel() {
     }).join('');
 }
 
+function _weekMonday(dateStr) {
+  const dt = new Date(dateStr);
+  const day = dt.getDay(); // 0=Sun
+  dt.setDate(dt.getDate() - (day === 0 ? 6 : day - 1));
+  return dt.toISOString().slice(0, 10);
+}
+function _weekSunday(mondayStr) {
+  const dt = new Date(mondayStr);
+  dt.setDate(dt.getDate() + 6);
+  return dt.toISOString().slice(0, 10);
+}
+
 function onTrendMonthChange() {
   const month     = document.getElementById('trendMonthSel')?.value || '';
   const weekSel   = document.getElementById('trendWeekSel');
@@ -2047,17 +2059,29 @@ function onTrendMonthChange() {
   if (!month) {
     if (fromEl) fromEl.value = allDates[0] || '';
     if (toEl)   toEl.value   = allDates[allDates.length-1] || '';
-    if (weekSel)   { weekSel.innerHTML = '<option value="">Весь місяць</option>'; weekSel.style.display = 'none'; weekSel.value = ''; }
+    if (weekSel)   { weekSel.innerHTML = '<option value="">Весь час</option>'; weekSel.style.display = 'none'; weekSel.value = ''; }
     if (weekLabel) weekLabel.style.display = 'none';
   } else {
     const mDates = allDates.filter(d => d.startsWith(month));
     if (fromEl) fromEl.value = mDates[0] || (month + '-01');
     if (toEl)   toEl.value   = mDates[mDates.length-1] || (month + '-31');
+
+    // Group by calendar week (Mon–Sun)
+    const weekMap = {};
+    mDates.forEach(d => {
+      const mon = _weekMonday(d);
+      if (!weekMap[mon]) weekMap[mon] = [];
+      weekMap[mon].push(d);
+    });
+    const weekMons = Object.keys(weekMap).sort();
+
     if (weekSel) {
-      weekSel.innerHTML = `<option value="">Весь місяць (${mDates.length} тижн.)</option>` +
-        mDates.map(d => {
-          const [, mm, dd] = d.split('-');
-          return `<option value="${d}">${dd}.${mm}</option>`;
+      weekSel.innerHTML = `<option value="">Весь місяць (${weekMons.length} тижн.)</option>` +
+        weekMons.map(mon => {
+          const sun = _weekSunday(mon);
+          const [, mm1, dd1] = mon.split('-');
+          const [, mm2, dd2] = sun.split('-');
+          return `<option value="${mon}">${dd1}.${mm1} – ${dd2}.${mm2}</option>`;
         }).join('');
       weekSel.value = '';
       weekSel.style.display = '';
@@ -2079,8 +2103,9 @@ function onTrendWeekChange() {
     if (fromEl) fromEl.value = mDates[0] || '';
     if (toEl)   toEl.value   = mDates[mDates.length-1] || '';
   } else {
+    // week = Monday date; set range Mon–Sun
     if (fromEl) fromEl.value = week;
-    if (toEl)   toEl.value   = week;
+    if (toEl)   toEl.value   = _weekSunday(week);
   }
   onTrendFilterChange();
 }
@@ -2251,7 +2276,7 @@ function buildTrendsChart() {
     const cat = document.getElementById('trendCat')?.value || '';
     if (titleEl) titleEl.textContent = cat
       ? `Тренд: ${cat}`
-      : 'Динаміка Google Trends (тижнева)';
+      : 'Динаміка Google Trends (зрізи)';
   }
 
   const datasets = topKws.map((kw, i) => ({
@@ -2333,13 +2358,15 @@ function buildTrendsChart() {
                        'Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
     let txt;
     if (week) {
-      txt = `Тиждень: ${week.split('-').reverse().join('.')}`;
+      const sun = _weekSunday(week);
+      const fmtD = d => d.split('-').slice(1).reverse().join('.');
+      txt = `Тиждень: ${fmtD(week)} – ${fmtD(sun)}`;
     } else if (month) {
       const [y, mo] = month.split('-');
       txt = `Місяць: ${UA_MONTHS[parseInt(mo)] || mo} ${y} · ${weeks.length} тижн.`;
     } else {
       const fmt = d => d ? d.slice(0,7).replace('-','.') : '?';
-      txt = `Весь час: ${fmt(weeks[0])} — ${fmt(weeks[weeks.length-1])} · ${weeks.length} тижн.`;
+      txt = `Весь час: ${fmt(weeks[0])} — ${fmt(weeks[weeks.length-1])} · ${weeks.length} зрізів`;
     }
     periodEl.textContent = txt;
   }
@@ -2460,7 +2487,7 @@ function buildTrendsTable() {
         ${hasVolume ? '<th class="num">Частотність</th>' : ''}
         <th class="num">Сер. інтерес</th>
         <th class="num">Пік</th>
-        <th>Тиждень піку</th>
+        <th>Дата піку</th>
         <th class="num">Тренд</th>
         <th></th>
       </tr></thead>
